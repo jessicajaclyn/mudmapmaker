@@ -1,0 +1,2166 @@
+<!DOCTYPE html>
+<html>
+<body style="background-color:white;">
+<head>
+<title>MUD MapMaker</title>
+<script src=
+"https://ajax.googleapis.com/ajax/libs/jquery/3.4.0/jquery.min.js">
+    </script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Eagle+Lake&display=swap" rel="stylesheet">
+ 
+<script type="text/javascript">
+/*
+ * MUD Mapper
+ * Designed for mapping MUDs / Dungeons
+ * 
+ * Heavily modified by Jessica Reimer 2023
+ *
+ * Written for HTML5 Canvas
+ * Based on Virtual Graph Paper by Garrett Bartley
+ * http://www.garrettbartley.com/graphpaper.html
+ *
+ */
+
+// Declare global variables
+var global;
+var copied;
+var actions;
+var canvas;
+var ctx;
+var shape;
+
+var changed = false;    // need to save?
+
+var drawColor = 0;
+var fillColor = 0;
+
+const colors = new Array("Black","Gray","LightGray","Red","DarkRed","Peru","Gold","OrangeRed","DarkGreen","LimeGreen","Teal","SteelBlue","Blue","SaddleBrown","Violet","Indigo");
+const maxColor = colors.length - 1;
+const pi = 3.14159;
+
+const midpoint = ([x1, y1], [x2, y2]) => [(x1 + x2) / 2, (y1 + y2) / 2];
+var background = new Image();
+background.src = "https://mapper.techgirl.ca/old-paper-texture-background.jpg";
+
+
+// Use Debugger.log(string) to print out log messages to console
+var Debugger = function () { };
+Debugger.log = function (message) {
+   try {
+      console.log(message);
+   } catch (exception) {
+      return;
+   }
+}
+
+CanvasRenderingContext2D.prototype.roundRect = function (x, y, width, height, radius) {
+  if (width < 2 * radius) radius = width / 2;
+  if (height < 2 * radius) radius = height / 2;
+  this.beginPath();
+  this.moveTo(x + radius, y);
+  this.arcTo(x + width, y, x + width, y + height, radius);
+  this.arcTo(x + width, y + height, x, y + height, radius);
+  this.arcTo(x, y + height, x, y, radius);
+  this.arcTo(x, y, x + width, y, radius);
+  this.closePath();
+  return this;
+}
+
+
+
+
+// Called when everything is ready
+function BodyLoad() {
+	canvas = document.getElementById('canvas');
+    
+    var roomColorIndex = 0;
+
+	
+	// Set up the canvas context (ctx)
+	ctx = canvas.getContext('2d');
+	
+	// Set some canvas properties
+	canvas.width = window.innerWidth;
+	canvas.height = window.innerHeight;
+	canvas.mousedown = false;
+
+    
+
+    window.addEventListener('keydown', function (event) {
+		if (document.activeElement != document.body) {return;} // if body/canvas not focused - don't use key mappings
+		switch (event.keyCode) {
+			case 46:
+				actions.delete();
+				break;
+			case 107:                       //numpad +
+            case 221:                       // .
+				if (event.shiftKey){        //if shift is pressed
+                    if (global.objects[global.selected] < 0){break;} //make sure there's a selected object
+                    roomColorIndex = colors.indexOf(global.objects[global.selected].color);
+
+                    if (roomColorIndex == maxColor) {
+                        roomColorIndex = 0;
+                        global.objects[global.selected].color = colors[roomColorIndex];
+                        
+                    } //if it's max color, go to start of list
+                    else {
+                        roomColorIndex++;
+                        global.objects[global.selected].color = colors[roomColorIndex];
+                        }
+				    document.getElementById('color').value = colors[roomColorIndex];
+                    actions.update();
+                    break;
+                }
+                else {
+                    if (drawColor == maxColor) {drawColor = 0}
+                    else {drawColor++}
+                    document.getElementById('drawColor').value = colors[drawColor];
+                    actions.update();
+                    break;
+                }
+            case 109:                   //numpad -
+            case 219:                   // ,
+				if (event.shiftKey){        //if shift is pressed
+                    if (global.objects[global.selected] < 0){break;} //make sure there's a selected object
+                    roomColorIndex = colors.indexOf(global.objects[global.selected].color);
+                    
+                    if (roomColorIndex == 0) {
+                        roomColorIndex = maxColor;
+                        global.objects[global.selected].color = colors[roomColorIndex];
+                        
+                    } //if it's black, go to end of list
+                    else {
+                        roomColorIndex--;
+                        global.objects[global.selected].color = colors[roomColorIndex];
+                        }
+				    document.getElementById('color').value = colors[roomColorIndex];
+                    actions.update();
+                    break;
+                }
+                else {
+                    if (drawColor == 0) {drawColor = maxColor}
+                    else {drawColor--}
+                    document.getElementById('drawColor').value = colors[drawColor];
+                    actions.update();
+                    break;
+                }
+                break;
+            case 65:
+			case 100:
+			 	global.addWest();
+                break;
+			case 68:
+            case 102:
+				global.addEast();
+                break;
+			case 87:
+            case 104:
+				global.addNorth();
+                break;
+			case 83:
+            case 98:
+				global.addSouth();
+                break;
+			case 81:
+            case 103:
+				global.addNorthWest();
+                break;
+			case 69:
+            case 105:
+				global.addNorthEast();
+                break;
+			case 67:
+            case 99:
+                if (event.ctrlKey) {
+                    global.copyObj();
+                    break;
+                }
+				global.addSouthEast();
+                break;
+			case 86:
+                if (event.ctrlKey) {
+                    global.pasteObj();
+                    break;
+                }
+                break;
+            case 90:
+            case 97:
+		    	global.addSouthWest();
+                break;
+            case 111:
+    		    global.copyObj();
+                break;
+            case 106:
+		        global.pasteObj();
+                break;
+			case 110:
+            case 88:
+				global.toggleDoor();
+				break;
+           }
+	});
+	
+	document.getElementById('width').value = canvas.width;
+	document.getElementById('height').value = canvas.height;
+	
+	// Global variables object and associated functions
+	global = {
+		version: 11,            //version 10 changes 'square' to 'room' version 11 adds door object type
+		objects: [],
+        texts: [],
+        spacing: 24,
+		color: colors[drawColor], 
+		title: '',
+		selected: -1,	// currently selected object (-1 == none) 0 is first object.
+        selText: -1,    // currently selected text (-1 is none) 0 is first object.
+		drawGraphPaper: true,
+		fill: false,
+
+		// Only convert the settings we want saved to JSON
+		toJSON: function () {
+        	return {
+        		version: this.version,
+				width: canvas.width,
+				height: canvas.height,
+            	spacing: this.spacing,
+            	title: this.title,
+            	objects: this.objects,
+                texts: this.texts
+            }
+    	},
+
+       
+
+		toggleKeys: function (pad) {
+			// use this to change the display element of a div ID
+			var comm;
+			var nump;
+			comm = document.querySelector('#commands');
+			nump = document.querySelector('#numpadcommands');
+			
+			if (pad == true)
+			{
+				nump.style.display = "block";
+				comm.style.display = "none";
+				}
+			else
+			{
+				comm.style.display = "block";
+				nump.style.display = "none";
+			}
+			actions.update();
+		},
+        toggleDoor: function () {
+			
+			if (this.selected < 0) {return;} //nothing selected
+			if (this.objects[this.selected].type == 'line' || this.objects[this.selected].type == 'door') {
+				if (this.objects[this.selected].type == 'line') {
+				this.objects[this.selected].type = 'door';
+				} else {
+				this.objects[this.selected].type = 'line';
+				}
+			}
+			actions.update();
+			return;
+		},
+		
+        addText: function (x, y) {
+            // add a text object - how we get here to be determined but try right click first or maybe press T and capture mouse poistion
+            this.selText = this.texts.length;
+            this.texts[this.selText] = {
+                x: x,
+                y: x,
+                text: '',
+                underline: false,
+                bold: false,
+                italics: false,
+                direction: 0,           // degrees rotation, 0, 45, 90, 135, 180, 225, 270, 360
+            }
+
+            document.getElementById('text').value = '';
+            document.getElementById('underline').value = false;
+            document.getElementById('bold').value = false;
+            document.getElementById('italics').value = false;
+            document.getElementById('direction').value = 0;
+            return;
+        },
+
+            
+       
+        // Add a new object (square/line)
+		addObject: function(x1,y1,x2,y2,type) {
+			this.selected = this.objects.length;
+			this.objects[this.selected] = {
+				x1: x1,
+				y1: y1,
+				x2: x2,
+				y2: y2,
+				type: type,
+				fill: global.fill,
+				color: colors[drawColor],
+				label: '',
+				sub: '',
+				subpos: 'middle',
+				desc1: '',
+				desc2: '',
+				desc3: '',
+				desc4: '',
+				directions: '',
+				reverse: '',
+			}
+
+            
+			if (type == 'line') {
+				this.checkLine(this.objects[this.selected]); //orient the line W -> E then N -> S
+            }
+            var coordStr = "X1: " + x1 + " Y1: " + y1
+            if (x2 > 0) {
+                coordStr = coordStr + " X2: " + x2 + " Y2: " + y2
+            }
+            global.updateDesc4(coordStr);
+
+			// Update the color and label values in the HTML
+			document.getElementById('color').value = colors[drawColor];
+			document.getElementById('label').value = '';
+			document.getElementById('roomfill').checked = false;
+			document.getElementById('desc1').value = '';
+			document.getElementById('desc2').value = '';
+			document.getElementById('desc3').value = '';
+			document.getElementById('desc4').value = '';
+			document.getElementById('directions').value = '';
+			document.getElementById('subscript').value = '';
+			document.getElementById('subscriptposition').value = 'middle';
+
+			this.color = color;
+
+			actions.update();
+		},
+
+        copyObj: function() {
+            if (global.selected < 0) {
+            console.log("No object selected.");
+            return;
+            }
+            global.copied = global.objects[global.selected];
+            return;
+        },
+
+        pasteObj: function() {
+            if (global.selected < 0) {
+                //add new object here
+            }
+            else {
+                //change selected object to copied stats
+                global.updateColor(global.copied.color);
+                global.updateDesc1(global.copied.desc1);
+                global.updateDesc2(global.copied.desc2);
+                global.updateDesc3(global.copied.desc3);
+                global.updateDesc4(global.copied.desc4);
+                global.updateLabel(global.copied.label);
+                global.updateSubscript(global.copied.sub);
+                global.updateSubscriptPosition(global.copied.subpos);
+                global.updateFill(global.copied.fill);
+				global.updateType(global.copied.type);
+            }
+            actions.update();
+            return;
+
+        },
+		// Remove the last added object
+		undoObject: function() {
+			this.objects.splice(this.objects.length-1,1);
+			this.selected = -1;
+            changed = true;
+		},
+
+		// Delete the selected object
+		deleteSelected: function() {
+			if (this.selected >= 0) {
+				this.objects.splice(this.selected,1);
+				this.selected = -1;
+                changed = true;
+			}
+		},
+
+		// Delete all objects
+		resetObjects: function() {
+			this.objects = [];
+			this.selected = -1;
+		},
+
+		// Find the square object (if any) at the provided point (x,y)
+		findSquareObject: function(x,y) {
+			found = -1;
+
+			for(var i=0;i<this.objects.length;i++) {
+				if(this.objects[i].type=='room') {
+					if (this.objects[i].x1 == x && this.objects[i].y1 == y) {
+						found = i;
+						break;
+					}
+				}
+			}
+
+			return found;
+		},
+
+		
+        findConnection: function(obj1, obj2) {
+			// return true if connection, otherwise return false			
+			var room1 = this.objects[obj1];
+			var room2 = this.objects[obj2];
+			var headRoom = room1;
+			var tailRoom = room2;
+			var lineHead = {
+				x1: 0,
+				y1: 0,
+			};
+			var lineTail = {
+				x1: 0,
+				y1: 0,
+			};
+			//check to make sure both are rooms
+			console.log (headRoom, tailRoom);
+			//if ((global.findSquareObject(room1.x1,room1.y1) < 0) || (global.findSquareObject(room2.x1, room2.y1 < 0))) {return false;} 
+			//find head room and tail room. Lines are drawn left to right, then up to down
+			
+			if ((headRoom.x1 > tailRoom.x1) || (headRoom.x == tailRoom.x1 && headRoom.y1 > tailRoom.y2)) {headRoom = room2;tailRoom = room1;}
+			// assign line head and line tail
+			lineHead.x = headRoom.x1 + global.spacing/2;
+			lineHead.y = headRoom.y1 + global.spacing/2;
+			lineTail.x = tailRoom.x1 + global.spacing/2;
+			lineTail.y = tailRoom.y1 + global.spacing/2;
+			
+			for (var i=0; i < this.objects.length; i++) { 	//go through all objects
+				// see if object is line, then see if head x,y match, then see if tail x,y match
+				if (this.objects[i].type == 'line' || this.objects[i].type == 'door')
+				{
+					if (this.objects[i].x1 == lineHead.x) 
+					{
+						if (this.objects[i].y1 == lineHead.y) 
+						{
+							if (this.objects[i].x2 == lineTail.x) 
+							{
+								if (this.objects[i].y2 == lineTail.y) 
+								{
+									// we have a match
+									return true;
+								}
+							}
+						}
+					}
+				}
+			}
+			
+			return false;
+		},
+        // Find the line object (if any) at the provided point (x,y).
+		// This is done by calculating the distance from the point to the line.
+		findLineObject: function(x,y) {
+			found = -1;
+            
+            //for line every object
+			for(var i=0;i<this.objects.length;i++) {
+				if(this.objects[i].type=='line' || this.objects[i].type=='door') {
+
+					// The distance calculation assumes an infinite line so
+					// we need to make sure the point is actually near our
+					// line
+					x1=0;x2=0;y1=0;y2=0;
+
+					if (this.objects[i].x1 <= this.objects[i].x2) {
+						x1 = this.objects[i].x1;
+						x2 = this.objects[i].x2;
+					} else {
+						x1 = this.objects[i].x2;
+						x2 = this.objects[i].x1;						
+					}
+
+					if (this.objects[i].y1 <= this.objects[i].y2) {
+						y1 = this.objects[i].y1;
+						y2 = this.objects[i].y2;
+					} else {
+						y1 = this.objects[i].y2;
+						y2 = this.objects[i].y1;						
+					}
+
+					if (x >= x1 && x <= x2 && y >= y1 && y <= y2) {
+						dist = this.distanceToLine(this.objects[i].x1,
+							this.objects[i].y1,this.objects[i].x2,
+							this.objects[i].y2,x,y);
+						if (dist < (global.spacing / 2)) {
+							found = i;
+							break;
+						}
+					}
+				}
+			}
+
+			return found;			
+		},
+
+		// Distance from line (x1,y1,x2,y2) to a point (px,py)
+		// Code based on:
+		// http://developer.classpath.org/doc/java/awt/geom/Line2D-source.html
+		distanceToLine: function(x1,y1,x2,y2,px,py) {
+			pd2 = (x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2);
+
+      		x = 0.0;
+      		y = 0.0;
+
+      		if (pd2 == 0) {
+          		// Points are coincident.
+          		x = x1;
+          		y = y2;
+        	} else {
+          		u = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / pd2;
+          		x = x1 + (u * (x2 - x1));
+          		y = y1 + (u * (y2 - y1));
+        	}
+  
+ 			distSquared = (x - px) * (x - px) + (y - py) * (y - py);
+
+ 			return Math.sqrt(distSquared);
+    	},
+
+ 		// Select the specified object.
+		selectObject: function(o) {
+			this.selected = o;
+
+			this.color = this.objects[o].color;
+			document.getElementById('color').value = this.objects[o].color;
+			document.getElementById('label').value = this.objects[o].label;
+			document.getElementById('roomfill').checked = this.objects[o].fill;
+			document.getElementById('desc1').value = this.objects[o].desc1;
+			document.getElementById('desc2').value = this.objects[o].desc2;
+			document.getElementById('desc3').value = this.objects[o].desc3;
+			document.getElementById('desc4').value = this.objects[o].desc4;
+			document.getElementById('directions').value = this.objects[o].directions;
+			document.getElementById('subscript').value = this.objects[o].sub;
+			document.getElementById('subscriptposition').value = this.objects[o].subpos;
+
+			actions.update();
+		},
+
+   		// User updated the color on the main toolbar.
+		updateColor: function(color) {
+			this.color = color;
+
+			if (this.selected >= 0) {
+				this.objects[this.selected].color = color;
+				actions.update();
+                changed = true;
+			}
+		},
+		updateDrawColor: function(color) {
+			drawColor = colors.indexOf(color);
+            document.getElementById("canvas").focus();
+            actions.update();
+            changed = true;
+       },
+		// User updated the label on the main toolbar.
+		updateLabel: function(label) {
+			if (this.selected >= 0) {
+				this.objects[this.selected].label = label.trim();
+				actions.update();
+                changed = true;
+			}
+		},
+
+		updateType: function(type) {
+			if (this.selected >= 0) {
+					this.objects[this.selected].type = type;
+					actions.update();
+                    changed = true;
+			}
+
+		},
+
+		updateFill: function(fill) {
+			if (this.selected >= 0) {
+				this.objects[this.selected].fill = fill;
+				actions.update();
+                changed = true;
+			}
+		},
+
+		// User updated descriptions on the room toolbar.
+		updateDesc1: function(desc) {
+			if (this.selected >= 0) {
+				this.objects[this.selected].desc1 = desc.trim();
+                changed = true;
+			}
+		},
+
+		updateDesc2: function(desc) {
+			if (this.selected >= 0) {
+				this.objects[this.selected].desc2 = desc.trim();
+                changed = true;
+			}
+		},
+
+		updateDesc3: function(desc) {
+			if (this.selected >= 0) {
+				this.objects[this.selected].desc3 = desc.trim();
+                changed = true;
+			}
+		},
+
+		updateDesc4: function(desc) {
+			if (this.selected >= 0) {
+				this.objects[this.selected].desc4 = desc.trim();
+                changed = true;
+			}
+		},
+
+		// User updated the subscript on the room toolbar. 
+		updateSubscript: function(subscript) {
+			if (this.selected >= 0) {
+				this.objects[this.selected].sub = subscript.trim();
+				actions.update();
+                changed = true;
+			}
+		},
+
+		updateSubscriptPosition: function(position) {
+			if (this.selected >= 0) {
+				this.objects[this.selected].subpos = position;
+				actions.update();
+                changed = true;
+			}
+		},
+
+		// User updated the title on the map toolbar
+		updateTitle: function(title) {
+			this.title = title.trim();
+            //draw title in center, top of cavas
+            shape.drawTitle();
+			actions.update();
+            changed = true;
+		},
+
+		// User updated the canvas width on the map toolbar
+		updateWidth: function(width) {
+			canvas.width = width;
+			actions.update();
+            changed = true;
+		},
+		
+		// User updated the canvas height on the map toolbar
+		updateHeight: function(height) {
+			canvas.height = height;
+			actions.update();
+            changed = true;
+		},
+
+
+		updateGlobalFill: function(globalFill) {
+			global.fill = globalFill;
+			actions.update();
+		},
+
+		updateKeyEntry: function(keyEntry) {
+			global.keyEntry = keyEntry;
+			actions.update();
+		},
+
+// Lines should always be saved left to right (priority 1)
+		// and top to bottom (priority 2)
+		checkLine: function(line) {
+			var x1 = line.x1;
+			var x2 = line.x2;
+			var y1 = line.y1;
+			var y2 = line.y2;
+
+            // if x1 is right of x2 or y1 is below y2 reverse the line ends
+			if (x1 > x2 || (x1 == x2 && y1 > y2))
+			{
+				line.x1 = x2;
+				line.y1 = y2;
+				line.x2 = x1;
+				line.y2 = y1;
+			}
+		},
+
+        addWest: function() {
+            
+            var currRoom = this.selected;
+            var nextRoom;
+            if (this.objects[this.selected].type != 'room') {
+                console.log ('this is not a room');
+                return;
+            }
+            if ((this.objects[this.selected].x1 - (2 * global.spacing)) < 0) {
+                console.log ('This would go beyond left edge of canvas.');
+                return;
+            }
+            var x1 = this.objects[this.selected].x1 - (2 * global.spacing);
+            var x2 = 0;
+            var y1 = this.objects[this.selected].y1;
+            var y2 = 0;
+            var existing = global.findSquareObject(x1,y1);
+			var tempx;
+			var tempy;
+            tempx = x1; //save x and y because they get changed Jessica pick up here
+			tempy = y1;
+            
+            if (existing == -1) {   // no room exists
+
+                global.addObject(x1,y1,x2,y2,'room');
+
+                x1 = x1 + (2.5 * global.spacing);
+                y1 = y1 + (.5 * global.spacing);
+                x2 = x1 - (2 * global.spacing);
+                y2 = y1;
+
+                global.addObject(x1,y1,x2,y2,'line');
+                this.selected--;
+                
+            }
+			else {      // room exists
+						// is there already a linking line?
+						// if not, add the line, and change selected to the existing room
+						// restore x and y from temp because drawing the line changes them
+                nextRoom = existing; // room we moved to is the existing room
+                //if (global.findLineObject(x1,y1) == -1){
+				if (!global.findConnection (currRoom, nextRoom)) {
+
+                    // check if that line goes West from selected to previous selected
+                    // if not, then create new line
+
+					x1 = x1 + (2.5 * global.spacing);
+					y1 = y1 + (.5 * global.spacing);
+					x2 = x1 - (2 * global.spacing);
+					y2 = y1;
+					global.addObject(x1,y1,x2,y2,'line');
+					x1 = tempx;
+					y1 = tempy;
+                }
+				
+				//this.selected = global.findSquareObject(x1,y1);
+                this.selected = nextRoom;
+				}
+				actions.update();
+        },
+
+        addEast: function() {
+            var currRoom = this.selected;
+			var nextRoom;
+            if (this.objects[this.selected].type != 'room') {
+                console.log ('this is not a room');
+                return;
+            }
+            if ((this.objects[this.selected].x1 + (3 * global.spacing)) > canvas.width ) {
+                console.log ('This would go beyond right edge of canvas.');
+                return;
+            }
+            var x1 = this.objects[this.selected].x1 + (2 * global.spacing);
+            var x2 = 0;
+            var y1 = this.objects[this.selected].y1;
+            var y2 = 0;
+            var existing = global.findSquareObject(x1,y1);
+			var tempx = x1;
+			var tempy = y1;
+            if (existing == -1) {   // no room exists
+           
+                global.addObject(x1,y1,x2,y2,'room');
+                x1 = x1 + (.5 * global.spacing);
+                y1 = y1 + (.5 * global.spacing);
+                x2 = x1 - (2 * global.spacing);
+                y2 = y1;
+
+                global.addObject(x1,y1,x2,y2,'line');
+                this.selected--;
+            
+            }
+            else {      // room exists
+				nextRoom = existing;
+				if (!global.findConnection (currRoom, nextRoom)) {
+					// if no existing connection, make one
+					x1 = x1 + (.5 * global.spacing);
+                y1 = y1 + (.5 * global.spacing);
+                x2 = x1 - (2 * global.spacing);
+                y2 = y1;
+				global.addObject (x1,y1,x2,y2, 'line');
+				
+
+				}
+
+                this.selected = nextRoom;
+            }
+			actions.update();
+        },
+        addNorth: function() {
+            var currRoom = this.selected;
+			var nextRoom;
+            
+            if (this.objects[this.selected].type != 'room') {
+                console.log ('this is not a room');
+                return;
+            }
+            if ((this.objects[this.selected].y1 - (2 * global.spacing)) < 0 ) {
+                console.log ('This would go beyond top edge of canvas.');
+                return;
+            }
+            var x1 = this.objects[this.selected].x1;
+            var x2 = 0;
+            var y1 = this.objects[this.selected].y1 - (2 * global.spacing);
+            var y2 = 0;
+            var existing = global.findSquareObject(x1,y1);
+			nextRoom = existing;
+            if (existing == -1) {   // no room exists
+
+                global.addObject(x1,y1,x2,y2,'room');
+
+                x1 = x1 + (.5 * global.spacing);
+                y1 = y1 + (.5 * global.spacing);
+                x2 = x1;
+                y2 = y1 + (2 * global.spacing);
+
+                global.addObject(x1,y1,x2,y2,'line');
+                this.selected--;
+               
+            }
+            else {      // room exists
+				if (!global.findConnection (currRoom, nextRoom)){
+					x1 = x1 + (.5 * global.spacing);
+                y1 = y1 + (.5 * global.spacing);
+                x2 = x1;
+                y2 = y1 + (2 * global.spacing);
+
+                global.addObject(x1,y1,x2,y2,'line');
+               
+				}
+
+                this.selected = nextRoom;
+            }
+			actions.update();
+        },
+       
+        addSouth: function() {
+            var currRoom = this.selected;
+			var nextRoom;
+            if (this.objects[this.selected].type != 'room') {
+                console.log ('this is not a room');
+                return;
+            }
+            if ((this.objects[this.selected].y1 + (3 * global.spacing)) > canvas.height ) {
+                console.log ('This would go beyond bottom edge of canvas.');
+                return;
+            }
+            var x1 = this.objects[this.selected].x1;
+            var x2 = 0;
+            var y1 = this.objects[this.selected].y1 + (2 * global.spacing);
+            var y2 = 0;
+            var existing = global.findSquareObject(x1,y1);
+			nextRoom = existing;
+            if (existing == -1) {   // no room exists
+
+                global.addObject(x1,y1,x2,y2,'room');
+    
+                x1 = x1 + (.5 * global.spacing);
+                y1 = y1 + (.5 * global.spacing);
+                x2 = x1;
+                y2 = y1 - (2 * global.spacing);
+
+                global.addObject(x1,y1,x2,y2,'line');
+                this.selected--;
+               
+            }
+            else {      // room exists
+				if (!global.findConnection (currRoom, nextRoom)) {
+					x1 = x1 + (.5 * global.spacing);
+                y1 = y1 + (.5 * global.spacing);
+                x2 = x1;
+                y2 = y1 - (2 * global.spacing);
+
+                global.addObject(x1,y1,x2,y2,'line');
+               
+
+				}
+                this.selected = nextRoom;
+            }
+			actions.update();
+        },
+
+        addNorthWest: function() {
+            var currRoom = this.selected;
+			var nextRoom;
+            if (this.objects[this.selected].type != 'room') {
+                console.log ('this is not a room');
+                return;
+            }
+            if ((this.objects[this.selected].y1 - (2 * global.spacing)) < 0 ) {
+                console.log ('This would go beyond top edge of canvas.');
+                return;
+            }
+            if ((this.objects[this.selected].x1 - (2 * global.spacing)) < 0) {
+                console.log ('This would go beyond left edge of canvas.');
+                return;
+            }
+
+            var x1 = this.objects[this.selected].x1 - (2 * global.spacing);
+            var x2 = 0;
+            var y1 = this.objects[this.selected].y1 - (2 * global.spacing);
+            var y2 = 0;
+            var existing = global.findSquareObject(x1,y1);
+			nextRoom = existing;
+            if (existing == -1) {   // no room exists
+
+                global.addObject(x1,y1,x2,y2,'room');
+
+                x1 = x1 + (.5 * global.spacing);
+                y1 = y1 + (.5 * global.spacing);
+                x2 = x1 + (2 * global.spacing);
+                y2 = y1 + (2 * global.spacing);
+
+                global.addObject(x1,y1,x2,y2,'line');
+                this.selected--;
+               
+            }
+            else {      // room exists
+				if (!global.findConnection (currRoom, nextRoom)) {
+					x1 = x1 + (.5 * global.spacing);
+                y1 = y1 + (.5 * global.spacing);
+                x2 = x1 + (2 * global.spacing);
+                y2 = y1 + (2 * global.spacing);
+
+                global.addObject(x1,y1,x2,y2,'line');
+               
+				}
+
+                this.selected = nextRoom;
+            }
+			actions.update();
+        },
+
+        addNorthEast: function() {
+            var currRoom = this.selected;
+			var nextRoom;
+            if (this.objects[this.selected].type != 'room') {
+                console.log ('this is not a room');
+                return;
+            }
+            if ((this.objects[this.selected].y1 - (2 * global.spacing)) < 0 ) {
+                console.log ('This would go beyond top edge of canvas.');
+                return;
+            }
+            if ((this.objects[this.selected].x1 + (2 * global.spacing)) > canvas.width) {
+                console.log ('This would go beyond right edge of canvas.');
+                return;
+            }
+
+            var x1 = this.objects[this.selected].x1 + (2 * global.spacing);
+            var x2 = 0;
+            var y1 = this.objects[this.selected].y1 - (2 * global.spacing);
+            var y2 = 0;
+            var existing = global.findSquareObject(x1,y1);
+			nextRoom = existing;
+            if (existing == -1) {   // no room exists
+
+                global.addObject(x1,y1,x2,y2,'room');
+
+                x1 = x1 + (.5 * global.spacing);
+                y1 = y1 + (.5 * global.spacing);
+                x2 = x1 - (2 * global.spacing);
+                y2 = y1 + (2 * global.spacing);
+
+                global.addObject(x1,y1,x2,y2,'line');
+                this.selected--;
+               
+            }
+            else {      // room exists
+				if (!global.findConnection (currRoom, nextRoom)) {
+					x1 = x1 + (.5 * global.spacing);
+                y1 = y1 + (.5 * global.spacing);
+                x2 = x1 - (2 * global.spacing);
+                y2 = y1 + (2 * global.spacing);
+
+                global.addObject(x1,y1,x2,y2,'line');
+
+				}
+                this.selected = nextRoom;
+            }
+			actions.update();
+        },
+        addSouthEast: function() {
+            var currRoom = this.selected;
+			var nextRoom;
+            if (this.objects[this.selected].type != 'room') {
+                console.log ('this is not a room');
+                return;
+            }
+            if ((this.objects[this.selected].y1 + (3 * global.spacing)) > canvas.height ) {
+                console.log ('This would go beyond bottom edge of canvas.');
+                return;
+            }
+            if ((this.objects[this.selected].x1 + (2 * global.spacing)) > canvas.width) {
+                console.log ('This would go beyond right edge of canvas.');
+                return;
+            }
+
+            var x1 = this.objects[this.selected].x1 + (2 * global.spacing);
+            var x2 = 0;
+            var y1 = this.objects[this.selected].y1 + (2 * global.spacing);
+            var y2 = 0;
+            var existing = global.findSquareObject(x1,y1);
+			nextRoom = existing;
+            if (existing == -1) {   // no room exists
+
+                global.addObject(x1,y1,x2,y2,'room');
+
+                x1 = x1 + (.5 * global.spacing);
+                y1 = y1 + (.5 * global.spacing);
+                x2 = x1 - (2 * global.spacing);
+                y2 = y1 - (2 * global.spacing);
+
+                global.addObject(x1,y1,x2,y2,'line');
+                this.selected--;
+               
+            }
+            else {      // room exists
+				if (!global.findConnection (currRoom, nextRoom)) {
+					x1 = x1 + (.5 * global.spacing);
+                y1 = y1 + (.5 * global.spacing);
+                x2 = x1 - (2 * global.spacing);
+                y2 = y1 - (2 * global.spacing);
+
+                global.addObject(x1,y1,x2,y2,'line');
+
+				}
+
+                this.selected = nextRoom;
+            }
+			actions.update();
+        },
+        addSouthWest: function() {
+            var currRoom = this.selected;
+			var nextRoom;
+            if (this.objects[this.selected].type != 'room') {
+                console.log ('this is not a room');
+                return;
+            }
+            if ((this.objects[this.selected].y1 + (3 * global.spacing)) > canvas.height ) {
+                console.log ('This would go beyond bottom edge of canvas.');
+                return;
+            }
+            if ((this.objects[this.selected].x1 - (2 * global.spacing)) < 0) {
+                console.log ('This would go beyond left edge of canvas.');
+                return;
+            }
+
+            var x1 = this.objects[this.selected].x1 - (2 * global.spacing);
+            var x2 = 0;
+            var y1 = this.objects[this.selected].y1 + (2 * global.spacing);
+            var y2 = 0;
+            var existing = global.findSquareObject(x1,y1);
+			nextRoom = existing;
+            if (existing == -1) {   // no room exists
+
+                global.addObject(x1,y1,x2,y2,'room');
+
+                x1 = x1 + (.5 * global.spacing);
+                y1 = y1 + (.5 * global.spacing);
+                x2 = x1 + (2 * global.spacing);
+                y2 = y1 - (2 * global.spacing);
+
+                global.addObject(x1,y1,x2,y2,'line');
+                this.selected--;
+               
+            }
+            else {      // room exists
+				if (!global.findConnection (currRoom, nextRoom)) {
+					x1 = x1 + (.5 * global.spacing);
+                y1 = y1 + (.5 * global.spacing);
+                x2 = x1 + (2 * global.spacing);
+                y2 = y1 - (2 * global.spacing);
+
+                global.addObject(x1,y1,x2,y2,'line');
+
+				}
+
+                this.selected = nextRoom;
+            }
+			actions.update();
+        },
+
+
+
+		validObject: function(obj) {
+			
+			return true;
+		},
+	}
+
+	// UI actions
+	actions = {
+		// Redraw the whole page
+		update: function() {
+			canvas.redraw();
+			this.restore();
+		},
+
+    
+
+		// Redraw all the objects.
+		restore: function() {
+			//var roomid = document.querySelector('#room');
+			//roomid.style.display = 'none';
+
+			// Draw lines first
+			for(var i=0;i<global.objects.length;i++) {
+				if((global.objects[i].type=='line' || global.objects[i].type == 'door') &&
+					global.validObject(global.objects[i])) {
+					if (i == global.selected) {
+						// Highlight the selected line
+						shape.highlight(global.objects[i]);
+					}
+
+					shape.draw(global.objects[i]);
+				}
+			}
+
+			// Then draw squares
+			for(var i=0;i<global.objects.length;i++) {
+				if(global.objects[i].type=='room' &&
+					global.validObject(global.objects[i])) {
+					if (i == global.selected) {
+						// Highlight the selected square
+						shape.highlight(global.objects[i]);
+
+			//			roomid.style.display = 'block';
+					}
+
+					shape.draw(global.objects[i]);
+				}
+			}
+			shape.drawTitle();
+		},
+
+		// Remove the last drawn object
+		undo: function() {
+			global.undoObject();
+			this.update();
+		},
+
+		toggleFill: function() {
+			global.fill = !global.fill;
+			
+			this.update();
+		},
+		
+		// change room color to X
+		path: function() {
+			
+			const i = global.selected;
+			if (i < 0) {return;}
+			else {
+				global.objects[i].color = "Brown";
+				//shape.draw(global.objects[i]);
+			}
+
+			this.update();
+
+		},
+
+		// Removed the selected object
+		delete: function() {
+			global.deleteSelected();
+			this.update();
+		},
+
+		// Clear all the objects
+		clear: function() {
+            if (changed) {
+                if (!confirm('You have unsaved changes. Continue?')) {return};
+            }
+            global.resetObjects();
+			this.update();
+		},
+
+		sortObjects: function() {
+ 			var sorted = global.objects.slice(0);
+
+ 			sorted.sort(function (a,b) {
+  				if (a.y1 < b.y1) return -1;
+  				if (a.y1 > b.y1) return 1;
+  				if (a.x1 < b.x1) return -1;
+  				if (a.x1 > b.x1) return 1;
+  				return 0;
+			});
+            console.log(sorted);
+
+			return sorted;
+		},
+
+ 		autoUpdate: function() {
+			// eventually this will updated exits
+			this.update();
+		},
+
+		shift: function(xoff,yoff) {
+ 			for(var i=0;i<global.objects.length;i++) {
+ 				global.objects[i].x1 = global.objects[i].x1 + xoff*global.spacing;
+				global.objects[i].x2 = global.objects[i].x2 + xoff*global.spacing;
+				global.objects[i].y1 = global.objects[i].y1 + yoff*global.spacing;
+				global.objects[i].y2 = global.objects[i].y2 + yoff*global.spacing;
+			}
+
+			this.update();
+		},
+
+		// Automatically save text file to disk
+		saveFile: function(filename,text) {
+			var textFileAsBlob = new Blob([text], {type:'text/plain'});
+
+			var downloadLink = document.createElement("a");
+			downloadLink.download = filename;
+
+			downloadLink.innerHTML = "Download File";
+			if (window.webkitURL != null)
+			{
+				// Chrome allows the link to be clicked
+				// without actually adding it to the DOM.
+				downloadLink.href = window.webkitURL.createObjectURL(textFileAsBlob);
+			}
+			else
+			{
+				// Firefox requires the link to be added to the DOM
+				// before it can be clicked.
+				downloadLink.href = window.URL.createObjectURL(textFileAsBlob);
+				downloadLink.onclick = destroyClickedElement;
+				downloadLink.style.display = "none";
+				document.body.appendChild(downloadLink);
+			}
+
+			downloadLink.click();
+		},
+
+		// Save the map data to disk (in JSON format)
+		save: function() {
+			var filename = 'mapper.json';
+			if (global.title != undefined && global.title != '') {
+				filename = global.title + '.json';
+			}
+
+			var text = JSON.stringify(global,null,"\t");
+
+			this.saveFile(filename, text);
+            changed = false;
+		},
+
+		// Load the map from disk
+		load: function(files) {
+            if (changed) {
+                if (!confirm('You have unsaved changes. Continue?')) {return};
+            }
+            var file = files[0];
+
+      		var fileReader = new FileReader();
+			fileReader.onload = function(fileLoadedEvent) 
+			{
+				var textFromFileLoaded = fileLoadedEvent.target.result;
+				var data = JSON.parse(textFromFileLoaded);
+				//debug
+				console.log ('loaded file version: ' + data.version);
+				
+				global.objects = data.objects;
+				global.spacing = data.spacing;
+
+				global.title = data.title;
+				document.getElementById('title').value = global.title;
+                //global.updateTitle(global.title);
+				
+
+				if (data.version >= 2) {
+					canvas.width = data.width;
+					canvas.height = data.height;
+					
+					document.getElementById('width').value = canvas.width;
+					document.getElementById('height').value = canvas.height;
+				}
+				
+				for(var i=0;i<global.objects.length;i++) {
+					if (data.version < 3) {
+						global.objects[i].desc1 = '';
+						global.objects[i].desc2 = '';
+						global.objects[i].desc3 = '';
+						global.objects[i].desc4 = '';
+					}
+
+					if (data.version < 4) {
+						global.objects[i].directions = '';
+						global.objects[i].reverse = '';
+
+						if (global.objects[i].type == 'line') {
+							// Lines should always be drawn left to right
+							global.checkLine(global.objects[i]);
+						}
+                        
+                    }
+					if (data.version < 10) {
+						if (global.objects[i].type == 'square'){
+							global.objects[i].type = 'room';
+						}
+					}
+					if (data.version < 11) {
+						if (global.objects[i].type == 'door'){
+							global.objects[i].type = 'line';
+						}
+					}
+				}
+
+				actions.update();
+			};
+
+			fileReader.readAsText(file);
+            changed = false;
+ 		},
+
+        toggleGraphPaper: function() {
+            if (global.drawGraphPaper == true)  {global.drawGraphPaper = false;}
+            else {global.drawGraphPaper = true;}
+            this.update();
+
+        },
+
+		// Export to PNG
+		png: function() {
+			// Remove the highlighted object first
+			global.selected = -1;
+			//global.drawGraphPaper = false; removed and now have a toggle
+			this.update();
+            if (changed) {
+                console.log ("you have unsaved changes!");
+                if (!confirm('You have unsaved changes. Continue?')) {return};
+            }
+
+			//my add
+			const img = canvas.toDataURL('image/jpeg', 1.0);
+			document.write('<img src="'+img+'"/>');
+
+			//window.open(canvas.toDataURL('image/png'), 'Save as PNG');
+
+			//global.drawGraphPaper = true;
+			this.update();
+		},
+
+		// Export to HTML
+		html: function() {
+			var pngfilename = 'mapper.jpg';
+			var htmlfilename = 'mapper.html';
+
+			if (global.title != undefined && global.title != '') {
+				pngfilename = global.title + '.jpg';
+				htmlfilename = global.title + '.html';
+			}
+
+			var html = '';
+
+			html += '<!DOCTYPE html>\n';
+			html += '<html>\n';
+			html += '<head>\n';
+			html += '	<style>\n';
+			html += '		* {\n';
+			html += '			padding: 10;\n';
+			html += '			margin: 10;\n';
+			html += '		}\n';
+			html += '		.fit {\n';
+			html += '			max-width: 100%;\n';
+			html += '		}\n';
+			html += '		.center {\n';
+			html += '			display: block;\n';
+			html += '			margin: auto;\n';
+			html += '		}\n';
+			html += '	</style>\n';
+			html += '	<title>' + global.title + '</title>\n';
+			html += '</head>\n';
+			html += '\n';
+			html += '<body>\n';
+			html += '	<a href="' + pngfilename + '">'
+			html += '<img id="map" class="center fit" src="' + pngfilename + '"></a>\n';
+			html += '\n';
+			html += '	<table border="1" align="left">\n';
+			html += '		<tr>\n';
+			html += '			<th>Label</th>\n';
+			html += '			<th>Remark</th>\n';
+			html += '			<th>Commands</th>\n';
+			html += '			<th>Notes</th>\n';
+            html += '			<th>Rooms</th>\n';
+			
+
+//			html += '			<th>Directions</th>\n';
+			html += '		</tr>\n';
+
+			//var sorted = this.sortObjects();
+ 			for(var i=0;i<global.objects.length;i++) {
+				if(global.objects[i].type=='room') {
+					html += '		<tr>\n';
+                        if(global.objects[i].label != ''){html += '			<td>' + global.objects[i].label + '</td>\n';}
+                        if(global.objects[i].desc1 != ''){html += '			<td>' + global.objects[i].desc1 + '</td>\n';}
+                        if(global.objects[i].desc2 != ''){html += '			<td>' + global.objects[i].desc2 + '</td>\n';}
+                        if(global.objects[i].desc3 != ''){html += '			<td>' + global.objects[i].desc3 + '</td>\n';}
+                        if(global.objects[i].desc4 != ''){html += '			<td>' + global.objects[i].desc4 + '</td>\n';}
+
+					html += '		</tr>\n';
+				}
+			}
+
+			html += '</table>\n';
+			html += '</body>\n';
+			html += '</html>\n';
+			
+			this.saveFile(htmlfilename, html);
+		},
+
+
+	}
+
+	// Shape drawing functions
+	shape = {
+		x: 0, y: 0,
+
+		// Called on mouse down event
+		init: function(x,y) {
+			this.x = this.squareCoord(x);
+			this.y = this.squareCoord(y);
+		},
+
+		// Called on mouse up event
+		done: function(x,y) {
+			x2 = this.squareCoord(x);
+			y2 = this.squareCoord(y);
+
+			if (x2 == this.x && y2 == this.y) {
+				// Mouse didn't move.  Either draw a square or select an
+				// object.
+				o = global.findSquareObject(x2,y2);
+				if (o < 0) {
+					o = global.findLineObject(this.lineCoord(x),
+							this.lineCoord(y));
+				}
+
+				if (o < 0) {
+					global.addObject(this.x,this.y,0,0,'room');
+				} else {
+					global.selectObject(o);
+				}
+			} else {
+				// Mouse moved.  Draw line.
+				global.addObject(this.lineCoord(this.x),this.lineCoord(this.y),
+					this.lineCoord(x2),this.lineCoord(y2),'line');
+			}
+		},
+
+		drawTitle: function() {
+			if (global.title == '') {return;}
+			ctx.fillStyle = "Black";
+			ctx.strokeStyle = "Black";
+			//ctx.font = "42px MedievalSharp";
+			ctx.font = "42px Eagle Lake";
+			ctx.textAlign = "center";
+			ctx.fillText(global.title, .5 * canvas.width, 50);
+			ctx.fillStyle = "White";
+			
+			
+		
+		},
+
+		// Draw the specified shape
+		draw: function(obj) {
+			ctx.fillStyle = "white";
+			ctx.strokeStyle = obj.color;
+			ctx.lineWidth = 3;
+			var x = obj.x1+global.spacing/2;
+			var y = obj.y1+global.spacing/2+1;
+			var max = global.spacing;
+			
+			
+				
+			if (obj.type == 'room') {
+				if (obj.fill == true){
+					ctx.fillStyle = obj.color;
+				}
+			
+				ctx.roundRect(obj.x1,obj.y1,global.spacing,global.spacing,3);
+				ctx.fill();
+				ctx.stroke();
+		
+				if (obj.label != undefined) {
+					// if 3 letters or fewer - and filled room - use white
+					if (obj.fill && obj.label.length < 4) {
+						ctx.fillStyle = "White";
+					}
+					// otherwise use room color
+					else {ctx.fillStyle = obj.color;}
+					
+					ctx.textAlign = 'center';
+					ctx.textBaseline = 'middle';
+					ctx.font="12px Arial";
+
+					if (obj.label.length > 3){
+						// print label right of room
+						ctx.textAlign = 'left';
+						ctx.textBaseline = 'middle';
+						ctx.font = "16px Arial";
+						x = obj.x1+global.spacing+5;
+						max = 20 * max;
+					}
+					
+					ctx.fillText(obj.label,x,y,max);
+				}
+
+				if (obj.sub != undefined) {
+					ctx.fillStyle = colors[drawColor];
+					ctx.textAlign = 'left';
+					ctx.textBaseline = obj.subpos;
+					ctx.font="9px Helvetica";
+					ctx.fillText(obj.sub, obj.x1+global.spacing, obj.y1);
+				}
+			} else if (obj.type == 'line') {
+      			ctx.lineWidth = 2;
+				ctx.beginPath();
+				ctx.moveTo(obj.x1,obj.y1);
+				ctx.lineTo(obj.x2,obj.y2);
+				ctx.closePath();
+				ctx.stroke();
+
+				if (obj.label != undefined) {
+					x = obj.x1+((obj.x2-obj.x1)/2);
+					y = obj.y1+((obj.y2-obj.y1)/2);
+
+					if (obj.y1 == obj.y2) {
+						// Horizontal line
+						y = y - 1;
+						ctx.textAlign = 'center';
+						ctx.textBaseline = 'bottom';
+					} else if (obj.x1 == obj.x2) {
+						// Vertical line
+						x = x + 2;
+						ctx.textAlign = 'left';
+						ctx.textBaseline = 'middle';						
+					} else {
+						// Diagonal line
+						x = x + 6;
+						ctx.textAlign = 'left';
+						ctx.textBaseline = 'middle';						
+					}
+
+					ctx.fillStyle = colors[drawColor];
+					ctx.font="bold 14px Arial";
+					ctx.fillText(obj.label,x,y);
+				}
+			} else {
+				ctx.lineWidth = 2;
+				ctx.beginPath();
+				ctx.moveTo(obj.x1,obj.y1);
+				ctx.lineTo(obj.x2,obj.y2);
+				ctx.closePath();
+				ctx.stroke();
+				// draw door
+				// draw the rectangle based on line direction but first just add a rectangle...
+				var midLine = midpoint([obj.x1,obj.y1], [obj.x2, obj.y2]);
+				ctx.fillStyle = 'white';
+				if (obj.fill == true){
+					ctx.fillStyle = obj.color;
+				}
+				ctx.strokeStyle = obj.color;
+				ctx.translate (midLine[0], midLine[1]);
+				if (obj.x1 == obj.x2) {ctx.rotate(90 * Math.PI / 180);} //vertical
+				else if (obj.y1 == obj.y2) {ctx.rotate (0);} //horizontal
+				else if (obj.x1 < obj.x2) { //diagonal
+					if (obj.y1 < obj.y2) {ctx.rotate (45 * Math.PI / 180);} // south east/ nw
+					else {ctx.rotate (135 * Math.PI / 180);} //north east / sw
+
+				}
+
+				// -2, -14, 4, 28
+				ctx.roundRect (-2, -global.spacing/2-2, 4, global.spacing+4,1 );
+				//rotate as needed - 0 rotate for horizontal, 45 deg for se/nw, 90 deg for n/s, and 135 deg for ne/sw
+				
+
+				ctx.fill();
+				ctx.stroke();
+				ctx.setTransform (1,0,0,1,0,0);
+				//ctx.restore();
+				if (obj.label != undefined) {
+					x = obj.x1+((obj.x2-obj.x1)/2);
+					y = obj.y1+((obj.y2-obj.y1)/2);
+
+					if (obj.y1 == obj.y2) {
+						// Horizontal line
+						y = y - 1;
+						ctx.textAlign = 'center';
+						ctx.textBaseline = 'bottom';
+					} else if (obj.x1 == obj.x2) {
+						// Vertical line
+						x = x + 2;
+						ctx.textAlign = 'left';
+						ctx.textBaseline = 'middle';						
+					} else {
+						// Diagonal line
+						x = x + 6;
+						ctx.textAlign = 'left';
+						ctx.textBaseline = 'middle';						
+					}
+
+					ctx.fillStyle = colors[drawColor];
+					ctx.font="bold 14px Arial";
+                    if (obj.type == 'door') {x = x + 10;}
+					ctx.fillText(obj.label,x,y);
+				}
+
+			}
+		
+		},
+
+		// Draw a guide line
+		guide: function(x,y) {
+			actions.update();
+
+			object = {
+				x1: this.lineCoord(this.x),
+				y1: this.lineCoord(this.y),
+				x2: this.lineCoord(x),
+				y2: this.lineCoord(y),
+				type: 'line',
+				color: colors[drawColor],
+				label: '',
+				sub: '',
+				subpos: 'middle'
+			};
+
+			this.draw(object);
+		},
+
+		// Highlight
+		highlight: function(obj) {
+      		ctx.lineWidth = 6;
+      		ctx.strokeStyle = 'magenta';
+
+      		ctx.beginPath();
+
+      		if (obj.type == 'room') {
+      			ctx.roundRect(obj.x1,obj.y1,global.spacing,global.spacing,4);
+				
+ 			} else if (obj.type == 'line') {
+				ctx.moveTo(obj.x1,obj.y1);
+				ctx.lineTo(obj.x2,obj.y2);
+				ctx.closePath();
+      		} else if (obj.type == 'door') {
+				// draw door
+				ctx.moveTo(obj.x1,obj.y1);
+				ctx.lineTo(obj.x2,obj.y2);
+				// figure out door rectangle
+				ctx.closePath();
+			}
+
+      		ctx.stroke();
+		},
+
+		// Top left corner of square on our graph paper
+		squareCoord: function(c) {
+			var coord = c - (c % global.spacing);
+			return coord;
+		},
+
+		// Center of square on our graph paper
+		lineCoord: function(c) {
+			var coord = this.squareCoord(c) + (global.spacing / 2);
+			return coord;
+		}
+	}
+
+	
+	
+	// Clear out everything
+	canvas.clear = function() {
+		ctx.clearRect(0,0,this.width,this.height);
+		ctx.fillStyle = "white";
+		ctx.fillRect(0,0,canvas.width,canvas.height);
+	}
+
+	// Redraw everything
+	canvas.redraw = function() {		
+		this.clear();
+		
+		if (global.drawGraphPaper) {
+			// Prepare to draw the grid
+			ctx.beginPath();
+			ctx.strokeStyle = 'lightblue';
+			ctx.lineWidth = 1;
+
+			// Vertical rule
+			for(var y=global.spacing;y<this.height;y=y+global.spacing) {
+				ctx.moveTo(0,y);
+				ctx.lineTo(this.width,y);
+			}
+
+			// Horizontal rule
+			for(var x=global.spacing;x<this.width;x=x+global.spacing) {
+				ctx.moveTo(x,0);
+				ctx.lineTo(x,this.height);
+			}
+
+			// Draw the grid
+			ctx.closePath();
+			ctx.stroke();
+		}
+	}
+
+
+	canvas.getMousePos = function(evt) {
+        var rect = this.getBoundingClientRect();
+        return {
+          x: evt.clientX - rect.left,
+          y: evt.clientY - rect.top
+        };
+    }
+	  
+	canvas.onmousemove = function(e) {
+		if(!e) var e = window.event;
+		var pos = this.getMousePos(e);
+		
+		// If we're drawing a line, show the guide line
+		if(this.mousedown)
+			shape.guide(pos.x,pos.y);
+	}
+
+
+	canvas.onmousedown = function(e) {
+		if(!e) var e = window.event;
+		
+		this.mousedown = true;
+		
+		var pos = this.getMousePos(e);
+
+		shape.init(pos.x,pos.y);
+	}
+
+
+	canvas.onmouseup = function(e) {
+		if(!e) var e = window.event;
+
+		this.mousedown = false;
+		
+		var pos = this.getMousePos(e);
+
+		shape.done(pos.x,pos.y);
+	}
+		
+	// Now that all functions and objects are set, draw the grid
+	canvas.redraw();
+}
+</script>
+
+<style type="text/css">
+@font-face {
+	font-family: 'MedievalSharp';
+	src: url('https://fonts.gstatic.com/s/medievalsharp/v26/EvOJzAlL3oU5AQl2mP5KdgptMqhwMg.woff2') format('woff2');
+
+}
+
+
+
+body {
+	margin: 0;
+}
+
+#canvas { 
+    z-index: 1;
+}
+
+#commands {
+    z-index: 5;
+    position: fixed;
+	top: 20px;
+	right: 10px;
+	border: 2px solid #000;
+	background-color: #fff;
+	font-family: sans-serif;
+	font-size: 80%;
+	padding: 10px;
+	display: none;
+}
+
+#numpadcommands {
+	z-index: 5;
+	position: fixed;
+	top: 20px;
+	right: 10px;
+	border: 2px solid #000;
+	background-color: #fff;
+	font-family: sans-serif;
+	font-size: 80%;
+	padding: 10px;
+	display: block;
+
+}
+
+#commands p {
+margin: 0;
+clear: both;
+line-height: 1em;
+}
+
+#numpadcommands p {
+margin: 0;
+clear: both;
+line-height: 1em;
+}
+#textobject {
+	z-index: 3;
+	position: fixed;
+	bottom: 800px;
+	right: 10px;
+	border: 1px solid #000;
+	background-color: #fff;
+	font-family: sans-serif;
+	font-size: 90%;
+	padding: 10px;
+	display: block;
+}
+
+#textobject p {
+    margin: 0
+}
+#textobject p label {
+	font-weight: bold;
+	width: 7em;
+	float: left;
+	display: block;
+}
+
+
+#room {
+	z-index: 2;
+	position: fixed;
+	bottom: 435px;
+	right: 10px;
+	border: 1px solid #000;
+	background-color: #fff;
+	font-family: sans-serif;
+	font-size: 90%;
+	padding: 10px;
+	display: none;
+}
+
+#room p {
+	margin: 0;
+	clear: both;
+    line-height: 2em;
+}
+
+#room p label {
+	font-weight: bold;
+	width: 7em;
+	float: left;
+	display: block;
+}
+
+#room p textarea {
+	float: left;
+	border: 1px solid #000;
+	color: black;
+	display: block;
+}
+
+#room p select {
+	float: left;
+	border: 1px solid #000;
+	color: black;
+	display: block;
+}
+
+#shape {
+	z-index: 3;
+	position: fixed;
+	bottom: 280px;
+	right: 10px;
+	border: 1px solid #000;
+	background-color: #eee;
+	font-family: sans-serif;
+	font-size: 90%;
+	padding: 10px;
+}
+
+#shape p {
+	margin: 0;
+	clear: both;
+	line-height: 2em;
+}
+
+#shape h3 {
+    margin: 0;
+    clear: both;
+}
+
+#shape p label {
+	font-weight: bold;
+	width: 7em;
+	float: left;
+	display: block;
+}
+
+#shape p select {
+	float: left;
+	border: 1px solid #000;
+	color: black;
+	display: block;
+}
+
+#shape p textarea {
+	float: left;
+	border: 1px solid #000;
+	color: black;
+	display: block;
+}
+
+#map {
+	z-index: 4;
+	position: fixed;
+	bottom: 10px;
+	right: 10px;
+	border: 1px solid #000;
+	background-color: #fff;
+	font-family: sans-serif;
+	font-size: 90%;
+	padding: 10px;
+}
+
+#map p {
+	margin: 0;
+	clear: both;
+	line-height: 2em;
+}
+
+#map p label {
+	font-weight: bold;
+	width: 7em;
+	float: left;
+	display: block;
+}
+
+#map p textarea {
+	float: left;
+	border: 1px solid #000;
+	color: black;
+	display: block;
+}
+
+</style>
+</head>
+
+<body onload="BodyLoad()">
+
+<canvas id="canvas"></canvas>
+
+<div id="textobject">
+    <p>
+        <label>Text</label>
+        <textarea id="text" onchange="global.updateText(this.value)" rows=1 cols=30></textarea>
+    </p>
+    <p>
+        <select id="direction" onchange="global.updateDirection(this.value)">
+            <option selected>0</option>
+            <option>45</option>
+            <option>90</option>
+            <option>135</option>
+            <option>180</option>
+            <option>225</option>
+            <option>270</option>
+            <option>360</option>
+        
+        </select>
+    </p>
+    
+
+</div>
+
+
+<div id="room">
+	<p>
+		<label>Remarks</label>
+		<textarea id="desc1" onchange="global.updateDesc1(this.value)" rows=1 cols=30>
+		</textarea>
+	</p>
+
+	<p>
+		<label>Commands</label>
+		<textarea id="desc2" onchange="global.updateDesc2(this.value)" rows=1 cols=30>
+		</textarea>
+	</p>
+
+	<p>
+		<label>Notes</label>
+		<textarea id="desc3" onchange="global.updateDesc3(this.value)" rows=1 cols=30>
+		</textarea>
+	</p>
+
+	<p>
+		<label>Coords</label>
+		<textarea id="desc4" onchange="global.updateDesc4(this.value)" rows=1 cols=30>
+		</textarea>
+	</p>
+
+	<p>
+		<label>Subscript</label>
+		<textarea id="subscript" onchange="global.updateSubscript(this.value)" rows=1 cols=18>
+		</textarea>
+		<select id="subscriptposition" onchange="global.updateSubscriptPosition(this.value)">
+			<option selected>middle</option>
+			<option>top</option>
+			<option>bottom</option>
+		</select>
+	</p>
+
+	<p>
+		<label>Directions</label>
+		<textarea id="directions" rows=1 cols=22 readonly="readonly">
+		</textarea>
+	</p>
+
+</div>
+
+<div id="shape">
+	<h3>Room/Line/Door</h3>
+    <p>
+		<button onclick="actions.undo()">Undo</button>
+		<button onclick="actions.delete()">Delete</button>
+		<button onclick="actions.clear()">Clear</button>
+		<button onclick="actions.autoUpdate()">Auto</button>
+	</p>
+	<p>
+		<label>Color</label>
+		<select id="color" onchange="global.updateColor(this.value)">
+			<option selected>Black</option>
+			<option>Gray</option>
+			<option>LightGray</option>
+			<option>Red</option>
+			<option>DarkRed</option>
+			<option>Peru</option>
+			<option>Gold</option>
+			<option>OrangeRed</option>
+			<option>DarkGreen</option>
+			<option>LimeGreen</option>
+			<option>Teal</option>
+			<option>SteelBlue</option>
+			<option>Blue</option>
+			<option>SaddleBrown</option>
+			<option>Violet</option>
+			<option>Indigo</option>
+		</select>
+	</p>
+	<p>
+		<label>Label</label>
+		<textarea id="label" onchange="global.updateLabel(this.value)" rows=1 cols=30>
+		</textarea>
+	</p>
+	<p>
+		<label>Filled</label>
+		<input id="roomfill" type="checkbox" onchange="global.updateFill(this.checked)" />
+	</p>
+</div>
+
+<div id="map">
+	<p>
+		<label>Title</label>
+		<textarea id="title" onchange="global.updateTitle(this.value)" rows=1 cols=30>
+		</textarea>
+	</p>
+
+	<p>
+		<label>Canvas</label>
+		<textarea id="width" onchange="global.updateWidth(this.value)" rows=1 cols=9>
+		</textarea>
+		<textarea id="height" onchange="global.updateHeight(this.value)" rows=1	cols=9>
+		</textarea>
+	</p>
+	
+	<p>
+		<label>Shift</label>
+		<button onclick="actions.shift(-1, 0)">Left</button>
+		<button onclick="actions.shift(1, 0)">Right</button>
+		<button onclick="actions.shift(0, -1)">Up</button>
+		<button onclick="actions.shift(0, 1)">Down</button>
+	</p>
+
+    <p>
+		<label>Draw Filled</label>
+		<input id="globalfill" type="checkbox" onchange="global.updateGlobalFill(this.checked);" />
+	</p>
+    <p>
+        <label>Graph Paper</label>
+        <button onclick="actions.toggleGraphPaper()">Toggle</button>
+    </p>
+	
+	<p>
+		<label>Draw Color</label>
+		<select id="drawColor" onchange="global.updateDrawColor(this.value);">
+            <option selected>Black</option>
+			<option>Gray</option>
+			<option>LightGray</option>
+			<option>Red</option>
+			<option>DarkRed</option>
+			<option>Peru</option>
+			<option>Gold</option>
+			<option>OrangeRed</option>
+			<option>DarkGreen</option>
+			<option>LimeGreen</option>
+			<option>Teal</option>
+			<option>SteelBlue</option>
+			<option>Blue</option>
+			<option>SaddleBrown</option>
+			<option>Violet</option>
+			<option>Indigo</option>
+		</select>
+
+	</p>
+
+	<p>
+		<label>File (JSON)</label>
+		<button onclick="actions.save()">Save Map</button>
+        <button style="width:80px;" onclick="document.getElementById('load').click()">Load Map</button>
+        <input type="file" id="load" name="files" accept=".json" style="display:none;" onchange="actions.load(this.files)">
+	</p>
+
+	<p>
+		<label>Export</label>
+		<button onclick="actions.png()">JPEG</button>
+		<button onclick="actions.html()">HTML</button>
+	</p>
+
+	<p>
+		<label>Numberpad</label><input id="keytype" type="checkbox" checked onchange="global.toggleKeys(this.checked);"/>
+	</p>
+</div>
+<div id="numpadcommands">
+    <p>
+        <b>Commands</b><br>
+        <br>
+        Draw Color:   + / -<br>
+        Room Color: Shift + / -<br>
+        Copy: /<br>
+        Paste: *<br>
+        Draw: Numpad 12346789<br>
+        Toggle Door: Numpad .<br>
+    </p>
+</div>
+<div id="commands">
+    <p>
+        <b>Commands</b><br>
+        <br>
+        Draw Color:   [ / ]<br>
+        Room Color: Shift [ / ]<br>
+        Copy: ctl-c<br>
+        Paste: ctl-v<br>
+        Key Draw: WASD QEZC<br>
+		Toggle Door: x<br>
+    </p>
+</div>
+<div style="font-family:'Eagle Lake'">&nbsp;</div>
+
+</body>
+</html>
