@@ -42,7 +42,6 @@ const pi = 3.14159;
 
 const midpoint = ([x1, y1], [x2, y2]) => [(x1 + x2) / 2, (y1 + y2) / 2];
 var background = new Image();
-background.src = "https://mapper.techgirl.ca/old-paper-texture-background.jpg";
 
 
 // Use Debugger.log(string) to print out log messages to console
@@ -307,7 +306,7 @@ function BodyLoad() {
 				desc2: '',
 				desc3: '',
 				desc4: '',
-				directions: '',
+				exits: '',
 				reverse: '',
 			}
 
@@ -329,7 +328,7 @@ function BodyLoad() {
 			document.getElementById('desc2').value = '';
 			document.getElementById('desc3').value = '';
 			document.getElementById('desc4').value = '';
-			document.getElementById('directions').value = '';
+			document.getElementById('exits').value = '';
 			document.getElementById('subscript').value = '';
 			document.getElementById('subscriptposition').value = 'middle';
 
@@ -348,22 +347,26 @@ function BodyLoad() {
         },
 
         pasteObj: function() {
-            if (global.selected < 0) {
-                //add new object here
+            if (global.selected < 0 || !global.copied) {		// nowhere to paste it or nothing copied
+			return;
             }
-            else {
-                //change selected object to copied stats
-                global.updateColor(global.copied.color);
-                global.updateDesc1(global.copied.desc1);
-                global.updateDesc2(global.copied.desc2);
-                global.updateDesc3(global.copied.desc3);
-                global.updateDesc4(global.copied.desc4);
-                global.updateLabel(global.copied.label);
-                global.updateSubscript(global.copied.sub);
-                global.updateSubscriptPosition(global.copied.subpos);
-                global.updateFill(global.copied.fill);
-				global.updateType(global.copied.type);
-            }
+			
+			// don't paste room to door/line or vice versa
+			if (global.objects[global.selected].type == 'room' && global.copied.type != 'room') {return;}
+			if ((global.objects[global.selected].type == 'door' || global.objects[global.selected].type == 'line') && global.copied.type == 'room') {return;}
+
+            // change selected to copied    
+			global.updateColor(global.copied.color);
+			global.updateDesc1(global.copied.desc1);
+			global.updateDesc2(global.copied.desc2);
+			global.updateDesc3(global.copied.desc3);
+			global.updateDesc4(global.copied.desc4);
+			global.updateLabel(global.copied.label);
+			global.updateSubscript(global.copied.sub);
+			global.updateSubscriptPosition(global.copied.subpos);
+			global.updateFill(global.copied.fill);
+			global.updateType(global.copied.type);
+		
             actions.update();
             return;
 
@@ -537,7 +540,7 @@ function BodyLoad() {
 			document.getElementById('desc2').value = this.objects[o].desc2;
 			document.getElementById('desc3').value = this.objects[o].desc3;
 			document.getElementById('desc4').value = this.objects[o].desc4;
-			document.getElementById('directions').value = this.objects[o].directions;
+			document.getElementById('exits').value = this.objects[o].exits;
 			document.getElementById('subscript').value = this.objects[o].sub;
 			document.getElementById('subscriptposition').value = this.objects[o].subpos;
 
@@ -550,13 +553,14 @@ function BodyLoad() {
 
 			if (this.selected >= 0) {
 				this.objects[this.selected].color = color;
+				document.getElementById("color").value = color;
 				actions.update();
                 changed = true;
 			}
 		},
 		updateDrawColor: function(color) {
 			drawColor = colors.indexOf(color);
-            document.getElementById("canvas").focus();
+            document.getElementById("drawcolor").value = color;
             actions.update();
             changed = true;
        },
@@ -564,6 +568,7 @@ function BodyLoad() {
 		updateLabel: function(label) {
 			if (this.selected >= 0) {
 				this.objects[this.selected].label = label.trim();
+				document.getElementById("label").value = label.trim();
 				actions.update();
                 changed = true;
 			}
@@ -572,6 +577,7 @@ function BodyLoad() {
 		updateType: function(type) {
 			if (this.selected >= 0) {
 					this.objects[this.selected].type = type;
+
 					actions.update();
                     changed = true;
 			}
@@ -581,6 +587,7 @@ function BodyLoad() {
 		updateFill: function(fill) {
 			if (this.selected >= 0) {
 				this.objects[this.selected].fill = fill;
+				document.getElementById("roomfill").checked = fill;
 				actions.update();
                 changed = true;
 			}
@@ -590,6 +597,7 @@ function BodyLoad() {
 		updateDesc1: function(desc) {
 			if (this.selected >= 0) {
 				this.objects[this.selected].desc1 = desc.trim();
+				document.getElementById("desc1").value = desc.trim();
                 changed = true;
 			}
 		},
@@ -597,6 +605,7 @@ function BodyLoad() {
 		updateDesc2: function(desc) {
 			if (this.selected >= 0) {
 				this.objects[this.selected].desc2 = desc.trim();
+				document.getElementById("desc2").value = desc.trim();
                 changed = true;
 			}
 		},
@@ -604,6 +613,7 @@ function BodyLoad() {
 		updateDesc3: function(desc) {
 			if (this.selected >= 0) {
 				this.objects[this.selected].desc3 = desc.trim();
+				document.getElementById("desc3").value = desc.trim();
                 changed = true;
 			}
 		},
@@ -611,6 +621,7 @@ function BodyLoad() {
 		updateDesc4: function(desc) {
 			if (this.selected >= 0) {
 				this.objects[this.selected].desc4 = desc.trim();
+				document.getElementById("desc4").value = desc.trim();
                 changed = true;
 			}
 		},
@@ -619,6 +630,7 @@ function BodyLoad() {
 		updateSubscript: function(subscript) {
 			if (this.selected >= 0) {
 				this.objects[this.selected].sub = subscript.trim();
+				document.getElementById("subscript").value = subscript.trim();
 				actions.update();
                 changed = true;
 			}
@@ -627,6 +639,7 @@ function BodyLoad() {
 		updateSubscriptPosition: function(position) {
 			if (this.selected >= 0) {
 				this.objects[this.selected].subpos = position;
+				document.getElementById("subscriptposition").value = position;
 				actions.update();
                 changed = true;
 			}
@@ -637,6 +650,7 @@ function BodyLoad() {
 			this.title = title.trim();
             //draw title in center, top of cavas
             shape.drawTitle();
+			document.getElementById("title").value = title.trim();
 			actions.update();
             changed = true;
 		},
@@ -1100,6 +1114,7 @@ function BodyLoad() {
 		update: function() {
 			canvas.redraw();
 			this.restore();
+			
 		},
 
     
@@ -1291,7 +1306,7 @@ function BodyLoad() {
 					}
 
 					if (data.version < 4) {
-						global.objects[i].directions = '';
+						global.objects[i].exits = '';
 						global.objects[i].reverse = '';
 
 						if (global.objects[i].type == 'line') {
@@ -1300,6 +1315,13 @@ function BodyLoad() {
 						}
                         
                     }
+					if (global.objects[i].type == 'room' || global.objects[i].type == 'square') {
+							// fix x2,y2 for rooms
+							console.log ("this should run to change to zeroes");
+							global.objects[i].x2 = 0;
+							global.objects[i].y2 = 0;
+					}
+
 					if (data.version < 10) {
 						if (global.objects[i].type == 'square'){
 							global.objects[i].type = 'room';
@@ -1309,6 +1331,7 @@ function BodyLoad() {
 						if (global.objects[i].type == 'door'){
 							global.objects[i].type = 'line';
 						}
+						
 					}
 				}
 
@@ -1391,7 +1414,7 @@ function BodyLoad() {
             html += '			<th>Rooms</th>\n';
 			
 
-//			html += '			<th>Directions</th>\n';
+//			html += '			<th>exits</th>\n';
 			html += '		</tr>\n';
 
 			//var sorted = this.sortObjects();
@@ -1844,7 +1867,7 @@ line-height: 1em;
 	font-family: sans-serif;
 	font-size: 90%;
 	padding: 10px;
-	display: none;
+	display: block;
 }
 
 #room p {
@@ -2017,8 +2040,8 @@ line-height: 1em;
 	</p>
 
 	<p>
-		<label>Directions</label>
-		<textarea id="directions" rows=1 cols=22 readonly="readonly">
+		<label>exits</label>
+		<textarea id="exits" rows=1 cols=22 onchange="global.updateExits(this.value)">
 		</textarea>
 	</p>
 
