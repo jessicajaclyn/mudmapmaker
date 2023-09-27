@@ -31,20 +31,19 @@ var canvas;
 var ctx;
 var shape;
 
-var changed = false;    // need to save?
+var changed = false;    // has the current map changed since last save?
 
-var drawColor = 0;
-var fillColor = 0;
+var drawColor = 0;	// not saved to file
+var fillColor = 0;	// needs to be saved per room/door
 
 const colors = new Array("Black","Gray","LightGray","Red","DarkRed","Peru","Gold","OrangeRed","DarkGreen","LimeGreen","Teal","SteelBlue","Blue","SaddleBrown","Violet","Indigo");
-const maxColor = colors.length - 1;
-const pi = 3.14159;
+const maxColor = colors.length - 1;		//used for looping the colors
 
-const midpoint = ([x1, y1], [x2, y2]) => [(x1 + x2) / 2, (y1 + y2) / 2];
+const midpoint = ([x1, y1], [x2, y2]) => [(x1 + x2) / 2, (y1 + y2) / 2];		// find the center of a line. returns an array. [0] is x and [1] is y
 var background = new Image();
 
 
-// Use Debugger.log(string) to print out log messages to console
+// Use Debugger.log(string) to print out log messages to console - legacy code. I've not used this
 var Debugger = function () { };
 Debugger.log = function (message) {
    try {
@@ -54,6 +53,7 @@ Debugger.log = function (message) {
    }
 }
 
+// rounded rectangle function
 CanvasRenderingContext2D.prototype.roundRect = function (x, y, width, height, radius) {
   if (width < 2 * radius) radius = width / 2;
   if (height < 2 * radius) radius = height / 2;
@@ -67,44 +67,40 @@ CanvasRenderingContext2D.prototype.roundRect = function (x, y, width, height, ra
   return this;
 }
 
-
-
-
 // Called when everything is ready
 function BodyLoad() {
 	canvas = document.getElementById('canvas');
     
-    var roomColorIndex = 0;
-
+    
 	
 	// Set up the canvas context (ctx)
 	ctx = canvas.getContext('2d');
 	
-	// Set some canvas properties
+	// Set some canvas default properties
 	canvas.width = window.innerWidth;
 	canvas.height = window.innerHeight;
 	canvas.mousedown = false;
+	var roomColorIndex = 0;
 
-    
-
-    window.addEventListener('keydown', function (event) {
-		if (document.activeElement != document.body) {return;} // if body/canvas not focused - don't use key mappings
+    window.addEventListener('keydown', function (event) {		// main key listener
+		if (document.activeElement != document.body) {return;} 	// if body/canvas not focused - don't use key mappings
 		switch (event.keyCode) {
-			case 46:
+			case 46:						// del key
+			case 8:							// backspace
 				actions.delete();
 				break;
-			case 107:                       //numpad +
-            case 221:                       // .
-				if (event.shiftKey){        //if shift is pressed
-                    if (global.objects[global.selected] < 0){break;} //make sure there's a selected object
-                    roomColorIndex = colors.indexOf(global.objects[global.selected].color);
+			case 107:                       // numpad + change draw color
+            case 221:                       // . change draw color
+				if (event.shiftKey){        // if shift is pressed toggle current object color
+                    if (global.objects[global.selected] < 0){break;} 							// make sure there's a selected object
+                    roomColorIndex = colors.indexOf(global.objects[global.selected].color);		// get array position
 
-                    if (roomColorIndex == maxColor) {
+                    if (roomColorIndex == maxColor) {											// go to beginning if at end
                         roomColorIndex = 0;
                         global.objects[global.selected].color = colors[roomColorIndex];
                         
-                    } //if it's max color, go to start of list
-                    else {
+                    }
+                    else {																		 // if it's max color, go to start of list
                         roomColorIndex++;
                         global.objects[global.selected].color = colors[roomColorIndex];
                         }
@@ -112,24 +108,24 @@ function BodyLoad() {
                     actions.update();
                     break;
                 }
-                else {
+                else {																			// otherwise just increment to next color
                     if (drawColor == maxColor) {drawColor = 0}
                     else {drawColor++}
                     document.getElementById('drawColor').value = colors[drawColor];
                     actions.update();
                     break;
                 }
-            case 109:                   //numpad -
-            case 219:                   // ,
-				if (event.shiftKey){        //if shift is pressed
-                    if (global.objects[global.selected] < 0){break;} //make sure there's a selected object
+            case 109:                   	// numpad -
+            case 219:                   	// ,
+				if (event.shiftKey){        // if shift is pressed
+                    if (global.objects[global.selected] < 0){break;} 							// make sure there's a selected object
                     roomColorIndex = colors.indexOf(global.objects[global.selected].color);
                     
                     if (roomColorIndex == 0) {
                         roomColorIndex = maxColor;
                         global.objects[global.selected].color = colors[roomColorIndex];
                         
-                    } //if it's black, go to end of list
+                    } 																			// if it's black, go to end of list
                     else {
                         roomColorIndex--;
                         global.objects[global.selected].color = colors[roomColorIndex];
@@ -146,56 +142,56 @@ function BodyLoad() {
                     break;
                 }
                 break;
-            case 65:
-			case 100:
+            case 65:						// numpad 4
+			case 100:						// a
 			 	global.addWest();
                 break;
-			case 68:
-            case 102:
+			case 68:						// numpad 6
+            case 102:						// d
 				global.addEast();
                 break;
-			case 87:
-            case 104:
+			case 87:						// numpad 8
+            case 104:						// w
 				global.addNorth();
                 break;
-			case 83:
-            case 98:
+			case 83:						// numpad 2
+            case 98:						// s
 				global.addSouth();
                 break;
-			case 81:
-            case 103:
+			case 81:						// numpad 7
+            case 103:						// q
 				global.addNorthWest();
                 break;
-			case 69:
-            case 105:
+			case 69:						// numpad 9
+            case 105:						// e
 				global.addNorthEast();
                 break;
-			case 67:
-            case 99:
-                if (event.ctrlKey) {
+			case 67:						// numpad 3
+            case 99:						// c
+                if (event.ctrlKey) {		// ctl c
                     global.copyObj();
                     break;
                 }
 				global.addSouthEast();
                 break;
-			case 86:
-                if (event.ctrlKey) {
+			case 86:						// v
+                if (event.ctrlKey) {		// ctl v
                     global.pasteObj();
                     break;
                 }
                 break;
-            case 90:
-            case 97:
+            case 90:						// nupad 1
+            case 97:						// z
 		    	global.addSouthWest();
                 break;
-            case 111:
+            case 111:						// numpad /
     		    global.copyObj();
                 break;
-            case 106:
+            case 106:						// numpad *
 		        global.pasteObj();
                 break;
-			case 110:
-            case 88:
+			case 110:						// numpad .
+            case 88:						// x
 				global.toggleDoor();
 				break;
            }
@@ -206,14 +202,14 @@ function BodyLoad() {
 	
 	// Global variables object and associated functions
 	global = {
-		version: 11,            //version 10 changes 'square' to 'room' version 11 adds door object type
+		version: 11,            // version 10 changes 'square' to 'room' version 11 adds door object type
 		objects: [],
-        texts: [],
+        texts: [],				// adding a texts array for map text
         spacing: 24,
 		color: colors[drawColor], 
 		title: '',
-		selected: -1,	// currently selected object (-1 == none) 0 is first object.
-        selText: -1,    // currently selected text (-1 is none) 0 is first object.
+		selected: -1,			// currently selected object (-1 == none) 0 is first object.
+        selText: -1,    		// currently selected text (-1 is none) 0 is first object.
 		drawGraphPaper: true,
 		fill: false,
 
@@ -234,24 +230,23 @@ function BodyLoad() {
 
 		toggleKeys: function (pad) {
 			// use this to change the display element of a div ID
-			var comm;
-			var nump;
-			comm = document.querySelector('#commands');
-			nump = document.querySelector('#numpadcommands');
+			var comm = document.querySelector('#commands');				// get the 2 divs by ID
+			var nump = document.querySelector('#numpadcommands');
 			
 			if (pad == true)
 			{
-				nump.style.display = "block";
-				comm.style.display = "none";
+				nump.style.display = "block";						// hide command div
+				comm.style.display = "none";						// show number pad div
 				}
 			else
 			{
-				comm.style.display = "block";
-				nump.style.display = "none";
+				comm.style.display = "block";						// show command div
+				nump.style.display = "none";						// hide number pad div
 			}
 			actions.update();
 		},
-        toggleDoor: function () {
+        
+		toggleDoor: function () {
 			
 			if (this.selected < 0) {return;} //nothing selected
 			if (this.objects[this.selected].type == 'line' || this.objects[this.selected].type == 'door') {
@@ -260,8 +255,8 @@ function BodyLoad() {
 				} else {
 				this.objects[this.selected].type = 'line';
 				}
+				actions.update();
 			}
-			actions.update();
 			return;
 		},
 		
@@ -271,6 +266,7 @@ function BodyLoad() {
             this.texts[this.selText] = {
                 x: x,
                 y: x,
+				color: 'black',
                 text: '',
                 underline: false,
                 bold: false,
@@ -440,13 +436,13 @@ function BodyLoad() {
 				// see if object is line, then see if head x,y match, then see if tail x,y match
 				if (this.objects[i].type == 'line' || this.objects[i].type == 'door')
 				{
-					if (this.objects[i].x1 == lineHead.x) 
+					if (this.objects[i].x1 == lineHead.x) 					// found x1 match
 					{
-						if (this.objects[i].y1 == lineHead.y) 
+						if (this.objects[i].y1 == lineHead.y) 				// found y1 match
 						{
-							if (this.objects[i].x2 == lineTail.x) 
+							if (this.objects[i].x2 == lineTail.x) 			// found x2 match
 							{
-								if (this.objects[i].y2 == lineTail.y) 
+								if (this.objects[i].y2 == lineTail.y) 		// found y2 match - found a connection
 								{
 									// we have a match
 									return true;
@@ -582,6 +578,11 @@ function BodyLoad() {
                     changed = true;
 			}
 
+		},
+
+		updateText: function(text) {
+			if (this.selText < 0) {return;}
+			//this.texts[this.selText]
 		},
 
 		updateFill: function(fill) {
@@ -1151,6 +1152,13 @@ function BodyLoad() {
 					shape.draw(global.objects[i]);
 				}
 			}
+			
+			// Then draw texts
+			for(var i=0;i<global.texts.length;i++) {
+				shape.drawText(global.texts[i]);
+				}
+			
+
 			shape.drawTitle();
 		},
 
@@ -1491,6 +1499,22 @@ function BodyLoad() {
 		
 		},
 
+		// Draw the text object on canvas
+		drawText: function(txtObj) {
+			var x = txtObj.x;
+			var y = txtObj.y;
+			ctx.fillStyle = txtObj.color;
+			ctx.strokeStyle = txtObj.color;
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'middle';
+			ctx.font="16px Eagle Lake";
+			
+			ctx.fillText (txtObj.text, x, y);
+			ctx.fill();
+			ctx.stroke();
+
+		},
+
 		// Draw the specified shape
 		draw: function(obj) {
 			ctx.fillStyle = "white";
@@ -1561,14 +1585,15 @@ function BodyLoad() {
 						ctx.textBaseline = 'bottom';
 					} else if (obj.x1 == obj.x2) {
 						// Vertical line
-						x = x + 2;
+						x = x + 4;
 						ctx.textAlign = 'left';
 						ctx.textBaseline = 'middle';						
 					} else {
 						// Diagonal line
-						x = x + 6;
+						x = x + 8;
+						y = y -2;
 						ctx.textAlign = 'left';
-						ctx.textBaseline = 'middle';						
+						ctx.textBaseline = 'top';						
 					}
 
 					ctx.fillStyle = colors[drawColor];
