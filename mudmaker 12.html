@@ -370,6 +370,7 @@ function BodyLoad() {
 			global.updateSubscript(global.copied.sub);
 			global.updateSubscriptPosition(global.copied.subpos);
 			global.updateFill(global.copied.fill);
+			global.updateFillColor(global.copied.fillColor);
 			global.updateType(global.copied.type);
 		
             actions.update();
@@ -1629,7 +1630,7 @@ function BodyLoad() {
 					ctx.fillText(obj.sub, obj.x1+global.spacing, obj.y1);
 				}
 			} else if (obj.type == 'line') {
-      			ctx.lineWidth = 2;
+      			ctx.lineWidth = 3;
 				ctx.beginPath();
 				ctx.moveTo(obj.x1,obj.y1);
 				ctx.lineTo(obj.x2,obj.y2);
@@ -1679,7 +1680,7 @@ function BodyLoad() {
 					}
 					else {
 					ctx.fillStyle = obj.fillColor;
-					ctx.lineWidth = 1;
+					
 					}
 				}
 				ctx.strokeStyle = obj.color;
@@ -1701,7 +1702,7 @@ function BodyLoad() {
 				ctx.stroke();
 				ctx.setTransform (1,0,0,1,0,0);
 				//ctx.restore();
-				ctx.lineWidth = 2;
+				
 				if (obj.label != undefined) {
 					x = obj.x1+((obj.x2-obj.x1)/2);
 					y = obj.y1+((obj.y2-obj.y1)/2);
@@ -1873,13 +1874,6 @@ function BodyLoad() {
 </script>
 
 <style type="text/css">
-@font-face {
-	font-family: 'MedievalSharp';
-	src: url('https://fonts.gstatic.com/s/medievalsharp/v26/EvOJzAlL3oU5AQl2mP5KdgptMqhwMg.woff2') format('woff2');
-
-}
-
-
 
 body {
 	margin: 0;
@@ -1891,12 +1885,11 @@ body {
 	flex-direction: column;
 	position: fixed;
 	background-color: red;
-	width: 15%;
+	width: 335px;
 	bottom: 20px;
 	right: 10px;
 	float: right;
 }
-
 
 #canvas { 
     z-index: 1;
@@ -1946,9 +1939,9 @@ line-height: 1.5em;
 	border: 1px solid #000;
 	background-color: #fff;
 	font-family: sans-serif;
-	font-size: 85%;
+	font-size: 75%;
 	padding: 10px;
-	display: block;
+	display: none;
 }
 
 #textobject p {
@@ -1956,6 +1949,7 @@ line-height: 1.5em;
 	clear: both;
 	line-height: 2em;
 }
+
 #textobject p label {
 	font-weight: bold;
 	width: 8em;
@@ -1963,13 +1957,12 @@ line-height: 1.5em;
 	display: block;
 }
 
-
 #room {
 	z-index: 2;
 	border: 1px solid #000;
 	background-color: #fff;
 	font-family: sans-serif;
-	font-size: 85%;
+	font-size: 75%;
 	padding: 10px;
 	display: none;
 }
@@ -2006,7 +1999,7 @@ line-height: 1.5em;
 	border: 1px solid #000;
 	background-color: #eee;
 	font-family: sans-serif;
-	font-size: 85%;
+	font-size: 75%;
 	padding: 10px;
 }
 
@@ -2028,7 +2021,6 @@ line-height: 1.5em;
 	display: block;
 }
 
-
 #shape p textarea {
 	float: left;
 	border: 1px solid #000;
@@ -2041,7 +2033,7 @@ line-height: 1.5em;
 	border: 1px solid #000;
 	background-color: #fff;
 	font-family: sans-serif;
-	font-size: 85%;
+	font-size: 75%;
 	padding: 10px;
 }
 
@@ -2145,7 +2137,7 @@ line-height: 1.5em;
 			<button onclick="actions.undo()">Undo</button>
 			<button onclick="actions.delete()">Delete</button>
 			<button onclick="actions.clear()">Clear</button>
-			<button onclick="actions.autoUpdate()">Auto</button>
+			<button onclick="actions.autoUpdate()">Update</button>
 		</p>
 		<p>
 			<label>Obj/Fill Color</label>
