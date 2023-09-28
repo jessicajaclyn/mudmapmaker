@@ -34,7 +34,8 @@ var shape;
 var changed = false;    // has the current map changed since last save?
 
 var drawColor = 0;	// not saved to file
-var fillColor = 0;	// needs to be saved per room/door
+var drawFillColor = 'Default';	// needs to be saved per room/door
+
 
 const colors = new Array("Black","Gray","LightGray","Red","DarkRed","Peru","Gold","OrangeRed","DarkGreen","LimeGreen","Teal","SteelBlue","Blue","SaddleBrown","Violet","Indigo");
 const maxColor = colors.length - 1;		//used for looping the colors
@@ -85,6 +86,9 @@ function BodyLoad() {
     window.addEventListener('keydown', function (event) {		// main key listener
 		if (document.activeElement != document.body) {return;} 	// if body/canvas not focused - don't use key mappings
 		switch (event.keyCode) {
+			case 113:						// F2
+				document.getElementById("label").focus();
+				break;
 			case 46:						// del key
 			case 8:							// backspace
 				actions.delete();
@@ -202,7 +206,7 @@ function BodyLoad() {
 	
 	// Global variables object and associated functions
 	global = {
-		version: 11,            // version 10 changes 'square' to 'room' version 11 adds door object type
+		version: 12,            // version 10 changes 'square' to 'room' version 11 adds door object type, version 12 adds fillcolor
 		objects: [],
         texts: [],				// adding a texts array for map text
         spacing: 24,
@@ -295,6 +299,7 @@ function BodyLoad() {
 				type: type,
 				fill: global.fill,
 				color: colors[drawColor],
+				fillColor: 'Default',
 				label: '',
 				sub: '',
 				subpos: 'middle',
@@ -306,6 +311,9 @@ function BodyLoad() {
 				reverse: '',
 			}
 
+			if (drawFillColor != 'Default') {
+				this.objects[this.selected].fillColor = drawFillColor;
+			}
             
 			if (type == 'line') {
 				this.checkLine(this.objects[this.selected]); //orient the line W -> E then N -> S
@@ -318,6 +326,7 @@ function BodyLoad() {
 
 			// Update the color and label values in the HTML
 			document.getElementById('color').value = colors[drawColor];
+			//document.getElementById('fillcolor').value = 
 			document.getElementById('label').value = '';
 			document.getElementById('roomfill').checked = false;
 			document.getElementById('desc1').value = '';
@@ -329,7 +338,7 @@ function BodyLoad() {
 			document.getElementById('subscriptposition').value = 'middle';
 
 			this.color = color;
-
+			global.selectObject (this.selected);
 			actions.update();
 		},
 
@@ -530,6 +539,7 @@ function BodyLoad() {
 
 			this.color = this.objects[o].color;
 			document.getElementById('color').value = this.objects[o].color;
+			document.getElementById('fillcolor').value = this.objects[o].fillColor;
 			document.getElementById('label').value = this.objects[o].label;
 			document.getElementById('roomfill').checked = this.objects[o].fill;
 			document.getElementById('desc1').value = this.objects[o].desc1;
@@ -556,10 +566,37 @@ function BodyLoad() {
 		},
 		updateDrawColor: function(color) {
 			drawColor = colors.indexOf(color);
-            document.getElementById("drawcolor").value = color;
+            document.getElementById("drawColor").value = color;
             actions.update();
             changed = true;
-       },
+       	},
+
+		updateFillColor: function (color) {
+	   	// update fill color of an object (door/room)
+			if (this.selected < 0) {return;} // return if nothing selected
+			if (this.objects[this.selected].type == 'line') {return;} // don't do anything, it's a line
+			console.log ("Fill Color: " + color);
+			
+			if (color == 'Default'){
+				this.objects[this.selected].fillColor = this.objects[this.selected].color;
+				console.log ("chose default, so make fillColor same as color");
+			}
+			else {
+				this.objects[this.selected].fillColor = color;
+				console.log ("changed object fill color to: " + color);
+			}
+
+			actions.update();
+
+		//document.getElementById("fillcolor").value
+		},
+
+		updateDrawFillColor: function (color) {
+		// update fill color of new room/door
+			drawFillColor = color;
+
+		},
+
 		// User updated the label on the main toolbar.
 		updateLabel: function(label) {
 			if (this.selected >= 0) {
@@ -757,6 +794,7 @@ function BodyLoad() {
 				//this.selected = global.findSquareObject(x1,y1);
                 this.selected = nextRoom;
 				}
+				global.selectObject(this.selected);
 				actions.update();
         },
 
@@ -802,9 +840,11 @@ function BodyLoad() {
 				
 
 				}
+				global.selectObject(this.selected);
 
                 this.selected = nextRoom;
             }
+			
 			actions.update();
         },
         addNorth: function() {
@@ -851,6 +891,7 @@ function BodyLoad() {
 
                 this.selected = nextRoom;
             }
+			global.selectObject(this.selected);
 			actions.update();
         },
        
@@ -897,6 +938,8 @@ function BodyLoad() {
 				}
                 this.selected = nextRoom;
             }
+			global.selectObject(this.selected);
+
 			actions.update();
         },
 
@@ -948,6 +991,8 @@ function BodyLoad() {
 
                 this.selected = nextRoom;
             }
+			global.selectObject(this.selected);
+
 			actions.update();
         },
 
@@ -998,6 +1043,8 @@ function BodyLoad() {
 				}
                 this.selected = nextRoom;
             }
+			global.selectObject(this.selected);
+
 			actions.update();
         },
         addSouthEast: function() {
@@ -1048,6 +1095,8 @@ function BodyLoad() {
 
                 this.selected = nextRoom;
             }
+			global.selectObject(this.selected);
+
 			actions.update();
         },
         addSouthWest: function() {
@@ -1098,6 +1147,8 @@ function BodyLoad() {
 
                 this.selected = nextRoom;
             }
+			global.selectObject(this.selected);
+
 			actions.update();
         },
 
@@ -1122,8 +1173,8 @@ function BodyLoad() {
 
 		// Redraw all the objects.
 		restore: function() {
-			//var roomid = document.querySelector('#room');
-			//roomid.style.display = 'none';
+			var roomid = document.querySelector('#room');
+			roomid.style.display = 'none';
 
 			// Draw lines first
 			for(var i=0;i<global.objects.length;i++) {
@@ -1146,7 +1197,7 @@ function BodyLoad() {
 						// Highlight the selected square
 						shape.highlight(global.objects[i]);
 
-			//			roomid.style.display = 'block';
+						roomid.style.display = 'block';
 					}
 
 					shape.draw(global.objects[i]);
@@ -1294,7 +1345,7 @@ function BodyLoad() {
 
 				global.title = data.title;
 				document.getElementById('title').value = global.title;
-                //global.updateTitle(global.title);
+                
 				
 
 				if (data.version >= 2) {
@@ -1339,8 +1390,14 @@ function BodyLoad() {
 						if (global.objects[i].type == 'door'){
 							global.objects[i].type = 'line';
 						}
-						
 					}
+
+					if (data.version < 12) {
+					// sanitize for fillcolor - set to 'default'
+						global.objects[i].fillColor = 'Default';
+					}
+						
+					
 				}
 
 				actions.update();
@@ -1528,7 +1585,12 @@ function BodyLoad() {
 				
 			if (obj.type == 'room') {
 				if (obj.fill == true){
+					if (obj.fillColor == 'Default') {
 					ctx.fillStyle = obj.color;
+					}
+					else {
+					ctx.fillStyle = obj.fillColor;
+					}
 				}
 			
 				ctx.roundRect(obj.x1,obj.y1,global.spacing,global.spacing,3);
@@ -1612,7 +1674,13 @@ function BodyLoad() {
 				var midLine = midpoint([obj.x1,obj.y1], [obj.x2, obj.y2]);
 				ctx.fillStyle = 'white';
 				if (obj.fill == true){
+					if (obj.fillColor == 'Default') {
 					ctx.fillStyle = obj.color;
+					}
+					else {
+					ctx.fillStyle = obj.fillColor;
+					ctx.lineWidth = 1;
+					}
 				}
 				ctx.strokeStyle = obj.color;
 				ctx.translate (midLine[0], midLine[1]);
@@ -1633,6 +1701,7 @@ function BodyLoad() {
 				ctx.stroke();
 				ctx.setTransform (1,0,0,1,0,0);
 				//ctx.restore();
+				ctx.lineWidth = 2;
 				if (obj.label != undefined) {
 					x = obj.x1+((obj.x2-obj.x1)/2);
 					y = obj.y1+((obj.y2-obj.y1)/2);
@@ -1816,6 +1885,19 @@ body {
 	margin: 0;
 }
 
+#bar {
+	display: flex;
+	z-index: 2;
+	flex-direction: column;
+	position: fixed;
+	background-color: red;
+	width: 15%;
+	bottom: 20px;
+	right: 10px;
+	float: right;
+}
+
+
 #canvas { 
     z-index: 1;
 }
@@ -1850,33 +1932,33 @@ body {
 #commands p {
 margin: 0;
 clear: both;
-line-height: 1em;
+line-height: 2em;
 }
 
 #numpadcommands p {
 margin: 0;
 clear: both;
-line-height: 1em;
+line-height: 1.5em;
 }
 #textobject {
 	z-index: 3;
-	position: fixed;
-	bottom: 800px;
-	right: 10px;
+	position: relative;
 	border: 1px solid #000;
 	background-color: #fff;
 	font-family: sans-serif;
-	font-size: 90%;
+	font-size: 85%;
 	padding: 10px;
 	display: block;
 }
 
 #textobject p {
-    margin: 0
+    margin: 0;
+	clear: both;
+	line-height: 2em;
 }
 #textobject p label {
 	font-weight: bold;
-	width: 7em;
+	width: 8em;
 	float: left;
 	display: block;
 }
@@ -1884,15 +1966,12 @@ line-height: 1em;
 
 #room {
 	z-index: 2;
-	position: fixed;
-	bottom: 435px;
-	right: 10px;
 	border: 1px solid #000;
 	background-color: #fff;
 	font-family: sans-serif;
-	font-size: 90%;
+	font-size: 85%;
 	padding: 10px;
-	display: block;
+	display: none;
 }
 
 #room p {
@@ -1903,7 +1982,7 @@ line-height: 1em;
 
 #room p label {
 	font-weight: bold;
-	width: 7em;
+	width: 8em;
 	float: left;
 	display: block;
 }
@@ -1924,13 +2003,10 @@ line-height: 1em;
 
 #shape {
 	z-index: 3;
-	position: fixed;
-	bottom: 280px;
-	right: 10px;
 	border: 1px solid #000;
 	background-color: #eee;
 	font-family: sans-serif;
-	font-size: 90%;
+	font-size: 85%;
 	padding: 10px;
 }
 
@@ -1947,17 +2023,11 @@ line-height: 1em;
 
 #shape p label {
 	font-weight: bold;
-	width: 7em;
+	width: 8em;
 	float: left;
 	display: block;
 }
 
-#shape p select {
-	float: left;
-	border: 1px solid #000;
-	color: black;
-	display: block;
-}
 
 #shape p textarea {
 	float: left;
@@ -1968,13 +2038,10 @@ line-height: 1em;
 
 #map {
 	z-index: 4;
-	position: fixed;
-	bottom: 10px;
-	right: 10px;
 	border: 1px solid #000;
 	background-color: #fff;
 	font-family: sans-serif;
-	font-size: 90%;
+	font-size: 85%;
 	padding: 10px;
 }
 
@@ -1986,7 +2053,7 @@ line-height: 1em;
 
 #map p label {
 	font-weight: bold;
-	width: 7em;
+	width: 8em;
 	float: left;
 	display: block;
 }
@@ -1996,6 +2063,7 @@ line-height: 1em;
 	border: 1px solid #000;
 	color: black;
 	display: block;
+	padding-right: 2px;
 }
 
 </style>
@@ -2004,211 +2072,250 @@ line-height: 1em;
 <body onload="BodyLoad()">
 
 <canvas id="canvas"></canvas>
+<div id="bar">
+	<div id="textobject">
+		<p>
+			<label>Text</label>
+			<textarea id="text" onchange="global.updateText(this.value)" rows=1 cols=25></textarea>
+		</p>
+		<p>
+			<label>Direction</label>
+			<select id="direction" onchange="global.updateDirection(this.value)">
+				<option selected>0</option>
+				<option>45</option>
+				<option>90</option>
+				<option>135</option>
+				<option>180</option>
+				<option>225</option>
+				<option>270</option>
+				<option>360</option>
+			
+			</select>
+		</p>
+	</div>
 
-<div id="textobject">
-    <p>
-        <label>Text</label>
-        <textarea id="text" onchange="global.updateText(this.value)" rows=1 cols=30></textarea>
-    </p>
-    <p>
-        <select id="direction" onchange="global.updateDirection(this.value)">
-            <option selected>0</option>
-            <option>45</option>
-            <option>90</option>
-            <option>135</option>
-            <option>180</option>
-            <option>225</option>
-            <option>270</option>
-            <option>360</option>
-        
-        </select>
-    </p>
-    
 
+	<div id="room">
+		<p>
+			<label>Remarks</label>
+			<textarea id="desc1" onchange="global.updateDesc1(this.value)" rows=1 cols=25>
+			</textarea>
+		</p>
+
+		<p>
+			<label>Commands</label>
+			<textarea id="desc2" onchange="global.updateDesc2(this.value)" rows=1 cols=25>
+			</textarea>
+		</p>
+
+		<p>
+			<label>Notes</label>
+			<textarea id="desc3" onchange="global.updateDesc3(this.value)" rows=1 cols=25>
+			</textarea>
+		</p>
+
+		<p>
+			<label>Coords</label>
+			<textarea id="desc4" onchange="global.updateDesc4(this.value)" rows=1 cols=25>
+			</textarea>
+		</p>
+
+		<p>
+			<label>Subscript</label>
+			<textarea id="subscript" onchange="global.updateSubscript(this.value)" rows=1 cols=18>
+			</textarea>
+			<select id="subscriptposition" onchange="global.updateSubscriptPosition(this.value)">
+				<option selected>middle</option>
+				<option>top</option>
+				<option>bottom</option>
+			</select>
+		</p>
+
+		<p>
+			<label>exits</label>
+			<textarea id="exits" rows=1 cols=22 onchange="global.updateExits(this.value)">
+			</textarea>
+		</p>
+
+	</div>
+
+	<div id="shape">
+		<h3>Room/Line/Door</h3>
+		<p>
+			<button onclick="actions.undo()">Undo</button>
+			<button onclick="actions.delete()">Delete</button>
+			<button onclick="actions.clear()">Clear</button>
+			<button onclick="actions.autoUpdate()">Auto</button>
+		</p>
+		<p>
+			<label>Obj/Fill Color</label>
+			<select id="color" onchange="global.updateColor(this.value)">
+				<option selected>Black</option>
+				<option>Gray</option>
+				<option>LightGray</option>
+				<option>Red</option>
+				<option>DarkRed</option>
+				<option>Peru</option>
+				<option>Gold</option>
+				<option>OrangeRed</option>
+				<option>DarkGreen</option>
+				<option>LimeGreen</option>
+				<option>Teal</option>
+				<option>SteelBlue</option>
+				<option>Blue</option>
+				<option>SaddleBrown</option>
+				<option>Violet</option>
+				<option>Indigo</option>
+			</select>
+			<select id="fillcolor" onchange="global.updateFillColor(this.value)">
+				<option selected>Default</option>
+				<option>Black</option>
+				<option>Gray</option>
+				<option>LightGray</option>
+				<option>Red</option>
+				<option>DarkRed</option>
+				<option>Peru</option>
+				<option>Gold</option>
+				<option>OrangeRed</option>
+				<option>DarkGreen</option>
+				<option>LimeGreen</option>
+				<option>Teal</option>
+				<option>SteelBlue</option>
+				<option>Blue</option>
+				<option>SaddleBrown</option>
+				<option>Violet</option>
+				<option>Indigo</option>
+			</select>
+		</p>
+		<p>
+			<label>Label (F2)</label>
+			<textarea id="label" onchange="global.updateLabel(this.value)" rows=1 cols=25>
+			</textarea>
+		</p>
+		<p>
+			<label>Filled</label>
+			<input id="roomfill" type="checkbox" onchange="global.updateFill(this.checked)" />
+		</p>
+	</div>
+
+	<div id="map">
+		<p>
+			<label>Title</label>
+			<textarea id="title" onchange="global.updateTitle(this.value)" rows=1 cols=25>
+			</textarea>
+		</p>
+
+		<p>
+			<label>Canvas</label>
+			<textarea id="width" onchange="global.updateWidth(this.value)" rows=1 cols=9>
+			</textarea>
+			<textarea id="height" onchange="global.updateHeight(this.value)" rows=1	cols=9>
+			</textarea>
+		</p>
+		
+		<p>
+			<label>Shift</label>
+			<button onclick="actions.shift(-1, 0)">Left</button>
+			<button onclick="actions.shift(1, 0)">Right</button>
+			<button onclick="actions.shift(0, -1)">Up</button>
+			<button onclick="actions.shift(0, 1)">Down</button>
+		</p>
+
+		<p>
+			<label>Draw Filled</label>
+			<input id="globalfill" type="checkbox" onchange="global.updateGlobalFill(this.checked);" />
+		</p>
+		<p>
+			<label>Graph Paper</label>
+			<button onclick="actions.toggleGraphPaper()">Toggle</button>
+		</p>
+		
+		<p>
+			<label>Draw/Fill Color</label>
+			<select id="drawColor" onchange="global.updateDrawColor(this.value);">
+				<option selected>Black</option>
+				<option>Gray</option>
+				<option>LightGray</option>
+				<option>Red</option>
+				<option>DarkRed</option>
+				<option>Peru</option>
+				<option>Gold</option>
+				<option>OrangeRed</option>
+				<option>DarkGreen</option>
+				<option>LimeGreen</option>
+				<option>Teal</option>
+				<option>SteelBlue</option>
+				<option>Blue</option>
+				<option>SaddleBrown</option>
+				<option>Violet</option>
+				<option>Indigo</option>
+			</select>
+			
+			<select id="drawFillColor" onchange="global.updateDrawFillColor(this.value);">
+				<option selected>Default</option>
+				<option>Black</option>
+				<option>Gray</option>
+				<option>LightGray</option>
+				<option>Red</option>
+				<option>DarkRed</option>
+				<option>Peru</option>
+				<option>Gold</option>
+				<option>OrangeRed</option>
+				<option>DarkGreen</option>
+				<option>LimeGreen</option>
+				<option>Teal</option>
+				<option>SteelBlue</option>
+				<option>Blue</option>
+				<option>SaddleBrown</option>
+				<option>Violet</option>
+				<option>Indigo</option>
+			</select>
+
+		</p>
+
+		<p>
+			<label>File (JSON)</label>
+			<button onclick="actions.save()">Save Map</button>
+			<button style="width:80px;" onclick="document.getElementById('load').click()">Load Map</button>
+			<input type="file" id="load" name="files" accept=".json" style="display:none;" onchange="actions.load(this.files)">
+		</p>
+
+		<p>
+			<label>Export</label>
+			<button onclick="actions.png()">JPEG</button>
+			<button onclick="actions.html()">HTML</button>
+		</p>
+
+		<p>
+			<label>Numberpad</label><input id="keytype" type="checkbox" checked onchange="global.toggleKeys(this.checked);"/>
+		</p>
+	</div>
+	<div id="numpadcommands">
+		<p>
+			<b>Commands</b><br>
+			<br>
+			Draw Color:   + / -<br>
+			Room Color: Shift + / -<br>
+			Copy: /<br>
+			Paste: *<br>
+			Draw: Numpad 12346789<br>
+			Toggle Door: Numpad .<br>
+		</p>
+	</div>
+	<div id="commands">
+		<p>
+			<b>Commands</b><br>
+			<br>
+			Draw Color:   [ / ]<br>
+			Room Color: Shift [ / ]<br>
+			Copy: ctl-c<br>
+			Paste: ctl-v<br>
+			Key Draw: WASD QEZC<br>
+			Toggle Door: x<br>
+		</p>
+	</div>
 </div>
-
-
-<div id="room">
-	<p>
-		<label>Remarks</label>
-		<textarea id="desc1" onchange="global.updateDesc1(this.value)" rows=1 cols=30>
-		</textarea>
-	</p>
-
-	<p>
-		<label>Commands</label>
-		<textarea id="desc2" onchange="global.updateDesc2(this.value)" rows=1 cols=30>
-		</textarea>
-	</p>
-
-	<p>
-		<label>Notes</label>
-		<textarea id="desc3" onchange="global.updateDesc3(this.value)" rows=1 cols=30>
-		</textarea>
-	</p>
-
-	<p>
-		<label>Coords</label>
-		<textarea id="desc4" onchange="global.updateDesc4(this.value)" rows=1 cols=30>
-		</textarea>
-	</p>
-
-	<p>
-		<label>Subscript</label>
-		<textarea id="subscript" onchange="global.updateSubscript(this.value)" rows=1 cols=18>
-		</textarea>
-		<select id="subscriptposition" onchange="global.updateSubscriptPosition(this.value)">
-			<option selected>middle</option>
-			<option>top</option>
-			<option>bottom</option>
-		</select>
-	</p>
-
-	<p>
-		<label>exits</label>
-		<textarea id="exits" rows=1 cols=22 onchange="global.updateExits(this.value)">
-		</textarea>
-	</p>
-
-</div>
-
-<div id="shape">
-	<h3>Room/Line/Door</h3>
-    <p>
-		<button onclick="actions.undo()">Undo</button>
-		<button onclick="actions.delete()">Delete</button>
-		<button onclick="actions.clear()">Clear</button>
-		<button onclick="actions.autoUpdate()">Auto</button>
-	</p>
-	<p>
-		<label>Color</label>
-		<select id="color" onchange="global.updateColor(this.value)">
-			<option selected>Black</option>
-			<option>Gray</option>
-			<option>LightGray</option>
-			<option>Red</option>
-			<option>DarkRed</option>
-			<option>Peru</option>
-			<option>Gold</option>
-			<option>OrangeRed</option>
-			<option>DarkGreen</option>
-			<option>LimeGreen</option>
-			<option>Teal</option>
-			<option>SteelBlue</option>
-			<option>Blue</option>
-			<option>SaddleBrown</option>
-			<option>Violet</option>
-			<option>Indigo</option>
-		</select>
-	</p>
-	<p>
-		<label>Label</label>
-		<textarea id="label" onchange="global.updateLabel(this.value)" rows=1 cols=30>
-		</textarea>
-	</p>
-	<p>
-		<label>Filled</label>
-		<input id="roomfill" type="checkbox" onchange="global.updateFill(this.checked)" />
-	</p>
-</div>
-
-<div id="map">
-	<p>
-		<label>Title</label>
-		<textarea id="title" onchange="global.updateTitle(this.value)" rows=1 cols=30>
-		</textarea>
-	</p>
-
-	<p>
-		<label>Canvas</label>
-		<textarea id="width" onchange="global.updateWidth(this.value)" rows=1 cols=9>
-		</textarea>
-		<textarea id="height" onchange="global.updateHeight(this.value)" rows=1	cols=9>
-		</textarea>
-	</p>
-	
-	<p>
-		<label>Shift</label>
-		<button onclick="actions.shift(-1, 0)">Left</button>
-		<button onclick="actions.shift(1, 0)">Right</button>
-		<button onclick="actions.shift(0, -1)">Up</button>
-		<button onclick="actions.shift(0, 1)">Down</button>
-	</p>
-
-    <p>
-		<label>Draw Filled</label>
-		<input id="globalfill" type="checkbox" onchange="global.updateGlobalFill(this.checked);" />
-	</p>
-    <p>
-        <label>Graph Paper</label>
-        <button onclick="actions.toggleGraphPaper()">Toggle</button>
-    </p>
-	
-	<p>
-		<label>Draw Color</label>
-		<select id="drawColor" onchange="global.updateDrawColor(this.value);">
-            <option selected>Black</option>
-			<option>Gray</option>
-			<option>LightGray</option>
-			<option>Red</option>
-			<option>DarkRed</option>
-			<option>Peru</option>
-			<option>Gold</option>
-			<option>OrangeRed</option>
-			<option>DarkGreen</option>
-			<option>LimeGreen</option>
-			<option>Teal</option>
-			<option>SteelBlue</option>
-			<option>Blue</option>
-			<option>SaddleBrown</option>
-			<option>Violet</option>
-			<option>Indigo</option>
-		</select>
-
-	</p>
-
-	<p>
-		<label>File (JSON)</label>
-		<button onclick="actions.save()">Save Map</button>
-        <button style="width:80px;" onclick="document.getElementById('load').click()">Load Map</button>
-        <input type="file" id="load" name="files" accept=".json" style="display:none;" onchange="actions.load(this.files)">
-	</p>
-
-	<p>
-		<label>Export</label>
-		<button onclick="actions.png()">JPEG</button>
-		<button onclick="actions.html()">HTML</button>
-	</p>
-
-	<p>
-		<label>Numberpad</label><input id="keytype" type="checkbox" checked onchange="global.toggleKeys(this.checked);"/>
-	</p>
-</div>
-<div id="numpadcommands">
-    <p>
-        <b>Commands</b><br>
-        <br>
-        Draw Color:   + / -<br>
-        Room Color: Shift + / -<br>
-        Copy: /<br>
-        Paste: *<br>
-        Draw: Numpad 12346789<br>
-        Toggle Door: Numpad .<br>
-    </p>
-</div>
-<div id="commands">
-    <p>
-        <b>Commands</b><br>
-        <br>
-        Draw Color:   [ / ]<br>
-        Room Color: Shift [ / ]<br>
-        Copy: ctl-c<br>
-        Paste: ctl-v<br>
-        Key Draw: WASD QEZC<br>
-		Toggle Door: x<br>
-    </p>
-</div>
-<div style="font-family:'Eagle Lake'">&nbsp;</div>
+	<div style="font-family:'Eagle Lake'">&nbsp;</div>
 
 </body>
 </html>
