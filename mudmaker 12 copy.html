@@ -21,6 +21,10 @@
  * Based on Virtual Graph Paper by Garrett Bartley
  * http://www.garrettbartley.com/graphpaper.html
  *
+ * 
+ * feature request: round rooms, free text placement
+ * 
+ * 
  */
 
 // Declare global variables
@@ -30,6 +34,7 @@ var actions;
 var canvas;
 var ctx;
 var shape;
+var rightMouse = false;
 
 var changed = false;    // has the current map changed since last save?
 
@@ -1532,7 +1537,13 @@ function BodyLoad() {
 				}
 
 				if (o < 0) {
-					global.addObject(this.x,this.y,0,0,'room');
+					if (rightMouse) {
+						// add text object, change rightMouse false
+						rightMouse = false;
+					}
+					else {
+						global.addObject(this.x,this.y,0,0,'room');
+					}
 				} else {
 					global.selectObject(o);
 				}
@@ -1839,16 +1850,23 @@ function BodyLoad() {
 	  
 	canvas.onmousemove = function(e) {
 		if(!e) var e = window.event;
+		if (rightMouse) {			// right mouse button
+			console.log ("right mouse move");
+		}
 		var pos = this.getMousePos(e);
 		
 		// If we're drawing a line, show the guide line
-		if(this.mousedown)
+		if(this.mousedown && !rightMouse)
 			shape.guide(pos.x,pos.y);
 	}
 
 
 	canvas.onmousedown = function(e) {
 		if(!e) var e = window.event;
+		if (e.button != 0) {			// right mouse button - set global flag for right button
+			console.log ("right mouse down");
+			rightMouse = true;
+		}
 		
 		this.mousedown = true;
 		
@@ -1860,7 +1878,13 @@ function BodyLoad() {
 
 	canvas.onmouseup = function(e) {
 		if(!e) var e = window.event;
-
+		if (rightMouse) {			// right mouse button
+			console.log ("right mouse up");
+			this.mousedown = false;
+			//rightMouse = false;
+			// create a text object here
+			
+		}
 		this.mousedown = false;
 		
 		var pos = this.getMousePos(e);
@@ -1874,11 +1898,6 @@ function BodyLoad() {
 </script>
 
 <style type="text/css">
-@font-face {
-	font-family: 'MedievalSharp';
-	src: url('https://fonts.gstatic.com/s/medievalsharp/v26/EvOJzAlL3oU5AQl2mP5KdgptMqhwMg.woff2') format('woff2');
-
-}
 
 
 
@@ -2070,7 +2089,7 @@ line-height: 1.5em;
 </style>
 </head>
 
-<body onload="BodyLoad()">
+<body onload="BodyLoad()" oncontextmenu="return false;">
 
 <canvas id="canvas"></canvas>
 <div id="bar">
