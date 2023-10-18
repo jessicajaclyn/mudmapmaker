@@ -59,6 +59,44 @@ Debugger.log = function (message) {
    }
 }
 
+function drawArrow(fromx, fromy, tox, toy, arrowWidth, color){
+    //variables to be used when creating the arrow
+    var headlen = 10;
+    var angle = Math.atan2(toy-fromy,tox-fromx);
+ 
+    ctx.save();
+    ctx.strokeStyle = color;
+ 
+    //starting path of the arrow from the start square to the end square
+    //and drawing the stroke
+    ctx.beginPath();
+    ctx.moveTo(fromx, fromy);
+    ctx.lineTo(tox, toy);
+    ctx.lineWidth = arrowWidth;
+    ctx.stroke();
+ 
+    //starting a new path from the head of the arrow to one of the sides of
+    //the point
+    ctx.beginPath();
+    ctx.moveTo(tox, toy);
+    ctx.lineTo(tox-headlen*Math.cos(angle-Math.PI/7),
+               toy-headlen*Math.sin(angle-Math.PI/7));
+ 
+    //path from the side point of the arrow, to the other side point
+    ctx.lineTo(tox-headlen*Math.cos(angle+Math.PI/7),
+               toy-headlen*Math.sin(angle+Math.PI/7));
+ 
+    //path from the side point back to the tip of the arrow, and then
+    //again to the opposite side point
+    ctx.lineTo(tox, toy);
+    ctx.lineTo(tox-headlen*Math.cos(angle-Math.PI/7),
+               toy-headlen*Math.sin(angle-Math.PI/7));
+ 
+    //draws the paths created above
+    ctx.stroke();
+    ctx.restore();
+}
+
 // rounded rectangle function
 CanvasRenderingContext2D.prototype.roundRect = function (x, y, width, height, radius) {
   if (width < 2 * radius) radius = width / 2;
@@ -221,6 +259,7 @@ function BodyLoad() {
         selText: -1,    		// currently selected text (-1 is none) 0 is first object.
 		drawGraphPaper: true,
 		fill: false,
+		invis: false,
 
 		// Only convert the settings we want saved to JSON
 		toJSON: function () {
@@ -548,6 +587,7 @@ function BodyLoad() {
 			document.getElementById('fillcolor').value = this.objects[o].fillColor;
 			document.getElementById('label').value = this.objects[o].label;
 			document.getElementById('roomfill').checked = this.objects[o].fill;
+			document.getElementById('roominvis').checked = this.objects[o].invis;
 			document.getElementById('desc1').value = this.objects[o].desc1;
 			document.getElementById('desc2').value = this.objects[o].desc2;
 			document.getElementById('desc3').value = this.objects[o].desc3;
@@ -632,6 +672,14 @@ function BodyLoad() {
 			if (this.selected >= 0) {
 				this.objects[this.selected].fill = fill;
 				document.getElementById("roomfill").checked = fill;
+				actions.update();
+                changed = true;
+			}
+		},
+		updateInvis: function(invis) {
+			if (this.selected >= 0) {
+				this.objects[this.selected].invis = invis;
+				document.getElementById("roominvis").checked = invis;
 				actions.update();
                 changed = true;
 			}
@@ -1604,7 +1652,7 @@ function BodyLoad() {
 					ctx.fillStyle = obj.fillColor;
 					}
 				}
-			
+				
 				ctx.roundRect(obj.x1,obj.y1,global.spacing,global.spacing,3);
 				ctx.fill();
 				ctx.stroke();
@@ -1615,7 +1663,9 @@ function BodyLoad() {
 						ctx.fillStyle = "White";
 					}
 					// otherwise use room color
-					else {ctx.fillStyle = obj.color;}
+					else {
+						ctx.fillStyle = obj.color;
+					}
 					
 					ctx.textAlign = 'center';
 					ctx.textBaseline = 'middle';
@@ -1895,6 +1945,10 @@ function BodyLoad() {
 	// Now that all functions and objects are set, draw the grid
 	canvas.redraw();
 }
+
+
+
+
 </script>
 
 <style type="text/css">
@@ -2186,6 +2240,7 @@ line-height: 1.5em;
 				<option>SaddleBrown</option>
 				<option>Violet</option>
 				<option>Indigo</option>
+			
 			</select>
 			<select id="fillcolor" onchange="global.updateFillColor(this.value)">
 				<option selected>Default</option>
@@ -2205,6 +2260,7 @@ line-height: 1.5em;
 				<option>SaddleBrown</option>
 				<option>Violet</option>
 				<option>Indigo</option>
+			
 			</select>
 		</p>
 		<p>
@@ -2215,6 +2271,10 @@ line-height: 1.5em;
 		<p>
 			<label>Filled</label>
 			<input id="roomfill" type="checkbox" onchange="global.updateFill(this.checked)" />
+		</p>
+		<p>
+			<label>Invisible</label>
+			<input id="roominvis" type="checkbox" onchange="global.updateInvis(this.checked)" />
 		</p>
 	</div>
 
@@ -2269,6 +2329,7 @@ line-height: 1.5em;
 				<option>SaddleBrown</option>
 				<option>Violet</option>
 				<option>Indigo</option>
+			
 			</select>
 			
 			<select id="drawFillColor" onchange="global.updateDrawFillColor(this.value);">
@@ -2289,6 +2350,7 @@ line-height: 1.5em;
 				<option>SaddleBrown</option>
 				<option>Violet</option>
 				<option>Indigo</option>
+			
 			</select>
 
 		</p>
